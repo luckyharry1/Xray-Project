@@ -2,11 +2,6 @@
 #define DOSEADMIN_H
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h> // for line 15 and 41
-#include <stdbool.h>
-#include <ctype.h> // for disabling cap sensitivity
-#include <stdint.h>
-#include <stddef.h>
 
 #define MAX_NAME	(80)
 #define TABLE_SIZE			(256)

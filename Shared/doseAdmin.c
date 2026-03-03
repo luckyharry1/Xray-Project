@@ -1,5 +1,11 @@
 #include "doseAdmin.h"
 #include "doseAdmin_internal.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h> // for line 15 and 41
+#include <stdbool.h>
+#include <ctype.h> // for disabling cap sensitivity
 
 unsigned int hash(char *name){ // unsigned means it can store only positive whole number, doubling the positive range
     int length = strnlen(name, MAX_NAME); //count amount of char
@@ -27,7 +33,7 @@ void * getHashTable()
 void print_table()  { //FOR DEBUGGING
     for (int i = 0; i < TABLE_SIZE; i++) {
         if (hash_table [i] == NULL) {
-            printf("%i  NULL\n", i);
+            //printf("%i  NULL\n", i);
         }
         else{
             printf("%i  %s\n",i, hash_table[i]->name); //print the string of the name and number
@@ -56,7 +62,7 @@ bool hash_table_insert(person *p){
         return false;
     }
     char name_lowercase[MAX_NAME];
-    strncpy(name_lowercase, p->name, MAX_NAME); //make a copy, placing the person in the lowercase hased spot, with its original capitilization
+    strncpy(name_lowercase, p->name, MAX_NAME); //make a copy, placing the person in the lowercase hashed spot, with its original capitilization
     to_lowercase(name_lowercase);
     
     int index = hash(name_lowercase); //index for placing the person
@@ -79,24 +85,50 @@ person *hash_table_lookup (char *name){
     to_lowercase(name_lowercase); // copying the name for looking up, and changing it to lowercase
 
     int index = hash(name_lowercase);
-    if (hash_table[index] != NULL &&
-        strncmp(hash_table[index]->name, name, TABLE_SIZE)==0){ //comparing if the lookup == the name in the space
+    if (hash_table[index] != NULL){
             return hash_table[index];
     }
     else if (hash_table[index] == NULL){
         printf("ERROR, SPACE IS NULL\n");
-        return 0;
-    } 
-    else{
+        return NULL;
+    } else{
         printf("ERROR, SPACE IS MISMATCH\n");
-        return 0;
+        return NULL;
     }
 }
 
-int8_t SelectPatient(char * patientName)
-{
-	 return -1;
+person *hash_table_remove (char *name){
+    char name_lowercase[MAX_NAME];
+    strncpy(name_lowercase, name, MAX_NAME);
+    to_lowercase(name_lowercase); // copying the name for looking up, and changing it to lowercase
+
+    int index = hash(name_lowercase);
+
+    person* ptr = hash_table_lookup(name_lowercase);
+    hash_table[index] = NULL;
+    
 }
+
+/*person *SelectPatient(char *patientName)
+{
+    char name_lowercase[MAX_NAME];
+    strncpy(name_lowercase, patientName, MAX_NAME);
+    to_lowercase(name_lowercase); // copying the name for looking up, and changing it to lowercase
+
+    int index = hash(name_lowercase); //index for finding the person
+	
+    if (hash_table[index] != NULL && strncmp(hash_table[index]->name, patientName, MAX_NAME)==0){ //comparing if the lookup == the name in the space
+        //code
+        printf("test %s\n", hash_table[index]->name);
+        return hash_table[index];
+    } else if (hash_table[index] == NULL){
+        printf("ERROR, SPACE IS NULL\n");
+        return NULL;
+    } else{
+        printf("ERROR, SPACE IS MISMATCH\n");
+        return NULL;
+    }
+}*/
 
  
 int8_t AddPatientDose(Date* date, uint16_t dose)
@@ -142,11 +174,60 @@ int8_t ReadFromFile(char * filePath)
 	 return -1;
 }
 
+void handle_patient_selection(){
+    bool name_function = false;
+    char patient_name[MAX_NAME];
+    char name_lowercase[MAX_NAME];
+
+    printf("Enter name to search\n");
+    scanf("%s", patient_name);
+
+    strncpy(name_lowercase, patient_name, MAX_NAME);
+    to_lowercase(name_lowercase); // copying the name for looking up, and changing it to lowercase
+
+    if (patient_name == '\0'){
+        printf("\nNAME ERROR PLEASE TRY AGAIN\n");
+    } else{
+        name_function = true;
+    }
+    
+    person* ptr = hash_table_lookup(name_lowercase);
+
+    if (ptr == NULL) {
+        printf("\nERROR, NAME NOT FOUND\n");
+        return;
+    }
+
+    bool valid_input = false;
+    while (valid_input == false){
+    
+        int name_function_input;
+        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Remove User\n3. Exit\n", ptr->name);
+        scanf("%i", &name_function_input);
+        switch(name_function_input){
+            case(1):
+                printf("\nName: %s\nAge: %i\nDose: %i\n\n", 
+                ptr->name, 
+                ptr->age, 
+                ptr->dosage);
+                // alter patient details?
+                break;
+            case(2):
+                hash_table_lookup(name_lowercase);
+                break;
+            case(3):
+                name_function = false;
+                return;
+        }
+
+    }
+    
+}
+
+
 int main(){
 
     init_hash_table();
-
-    printf("Choose function\n1. Print ");
     
     person sjors = {.name="Sjors", .age = 100, .dosage = 0};
     person vasco = {.name = "Vasco", .age = 18, .dosage = 3};
@@ -156,7 +237,35 @@ int main(){
     hash_table_insert(&vasco);
     hash_table_insert(&natalie);
     //print_table();
+    
+    bool userInput = false;
+    while (userInput == false){
+        int function_input;
+        printf("Choose Function:\n1. Print Table\n2. Lookup Name\n3. Insert Name\n4. Delete all Table Data\n5. Exit and Delete Data\n");
+        
+        scanf("%i", &function_input);
 
+        switch(function_input) {
+            case(1):
+                print_table();
+                break;
+            case(2):
+                //SelectPatient(temp);
+                handle_patient_selection();
+                break;
+            case(3):
+                printf("output:3");
+                break;
+            case(4):
+                init_hash_table();
+                break;
+            case(5):
+                return 0;
+        }
+            
+
+        //userInput = true; INIFITE LOOP
+    }
 
 
     person *temp = hash_table_lookup("Sjors");
