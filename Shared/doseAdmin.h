@@ -2,9 +2,10 @@
 #define DOSEADMIN_H
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #define MAX_NAME	(80)
-#define TABLE_SIZE			(256)
+#define TABLE_SIZE  (256)
 
 typedef struct{ //struct is a group of variables, typedef is for initializing a variable (type)
     char name[MAX_NAME];
@@ -54,7 +55,7 @@ int8_t AddPatient(char * patientName);
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int8_t SelectPatient(char * patientName);
+person *SelectPatient(char *patientName);
 
 
 typedef struct {

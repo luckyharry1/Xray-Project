@@ -92,6 +92,8 @@ int main(){
 
     init_hash_table();
 
+    print_table();
+
     printf("Choose function\n1. Print ");
     
     person sjors = {.name="Sjors", .age = 100, .dosage = 0};
