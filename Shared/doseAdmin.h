@@ -22,7 +22,7 @@ person * hash_table[TABLE_SIZE];
  * present after creation
  *  
  */
-void CreatePatientDoseAdmin(); 
+void init_hash_table(); 
 					   
 
 /***************************************************************************************
@@ -43,7 +43,7 @@ void RemoveAllDataFromPatientDoseAdmin();
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int8_t AddPatient(char * patientName);
+int8_t hash_table_insert(person *p);
 
 
 /***************************************************************************************
@@ -55,7 +55,7 @@ int8_t AddPatient(char * patientName);
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-person *SelectPatient(char *patientName);
+person *hash_table_lookup (char *name);
 
 
 typedef struct {
@@ -101,7 +101,7 @@ int8_t PatientDoseInPeriod(char * patientName,
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int8_t RemovePatient(char * patientName);
+person *hash_table_remove (char *name);
 
 
 /***************************************************************************************

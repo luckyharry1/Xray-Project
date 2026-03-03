@@ -47,17 +47,7 @@ void to_lowercase(char *string){
     }
 }
 
-void CreatePatientDoseAdmin()
-{
-	 return;
-}
- 
-void RemoveAllDataFromPatientDoseAdmin()
-{
-	 return;
-}
-
-bool hash_table_insert(person *p){
+int8_t hash_table_insert(person *p){
     if (p == NULL) { //checking if the input isnt nothing
         return false;
     }
@@ -71,11 +61,6 @@ bool hash_table_insert(person *p){
     }
     hash_table[index] = p;
     return true;
-}
-
-int8_t AddPatient(char * patientName)
-{
-	 return -1;
 }
 
 // find a person in the table by their name (number)
@@ -108,32 +93,10 @@ person *hash_table_remove (char *name){
     hash_table[index] = NULL;
     
 }
-
-/*person *SelectPatient(char *patientName)
-{
-    char name_lowercase[MAX_NAME];
-    strncpy(name_lowercase, patientName, MAX_NAME);
-    to_lowercase(name_lowercase); // copying the name for looking up, and changing it to lowercase
-
-    int index = hash(name_lowercase); //index for finding the person
-	
-    if (hash_table[index] != NULL && strncmp(hash_table[index]->name, patientName, MAX_NAME)==0){ //comparing if the lookup == the name in the space
-        //code
-        printf("test %s\n", hash_table[index]->name);
-        return hash_table[index];
-    } else if (hash_table[index] == NULL){
-        printf("ERROR, SPACE IS NULL\n");
-        return NULL;
-    } else{
-        printf("ERROR, SPACE IS MISMATCH\n");
-        return NULL;
-    }
-}*/
-
  
 int8_t AddPatientDose(Date* date, uint16_t dose)
 {
-	 return -1;
+	return -1;
 }
  
 int8_t PatientDoseInPeriod(char * patientName, 
@@ -158,7 +121,7 @@ int8_t GetNumberOfMeasurements(char * patientName,
 	 return -1;
 }
 
-void GetHashPerformance(size_t *totalNumberOfPatients, double *averageNumberOfPatients,
+void get_hash_performance(size_t *totalNumberOfPatients, double *averageNumberOfPatients,
                         double *standardDeviation)
 {
 	 return;
@@ -241,7 +204,7 @@ int main(){
     bool userInput = false;
     while (userInput == false){
         int function_input;
-        printf("Choose Function:\n1. Print Table\n2. Lookup Name\n3. Insert Name\n4. Delete all Table Data\n5. Exit and Delete Data\n");
+        printf("Choose Function:\n1. Print Table\n2. Lookup Name\n3. Insert Name\n4. Delete all Table Data\n5. Calculate Table Performance\n6. Exit and Delete Data\n");
         
         scanf("%i", &function_input);
 
@@ -250,7 +213,6 @@ int main(){
                 print_table();
                 break;
             case(2):
-                //SelectPatient(temp);
                 handle_patient_selection();
                 break;
             case(3):
@@ -260,17 +222,15 @@ int main(){
                 init_hash_table();
                 break;
             case(5):
+                //get_hash_performance();
+                break;
+            case(6):
                 return 0;
         }
             
-
-        //userInput = true; INIFITE LOOP
     }
 
 
-    person *temp = hash_table_lookup("Sjors");
-
-    printf("%s\n", temp->name);
 
     /*printf("Jacob -> %u\n", hash("Jacob")); // %u is for unsigned
     printf("Natalie -> %u\n", hash("Natalie"));
