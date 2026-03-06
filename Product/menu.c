@@ -3,10 +3,12 @@
 #include <stdint.h>
 #include <fcntl.h>
 
+
 static int getInt();
 
 static const char* MenuStrings[] = {
     "Add Patient",
+    "View Patient Data"
     "Delete Patient",
     "Select Patient",
     "Select Examination Type", 
@@ -27,11 +29,9 @@ void displayMenu()
 	printf("choice: ");
 }
 
-#define MAX_STRLEN 80
-
 static int getInt()
 {
-    char line[MAX_STRLEN];
+    char line[MAX_NAME];
     char* result = NULL;
     int value = -1;
 

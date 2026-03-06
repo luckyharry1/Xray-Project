@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include "menu.h"
 #include <fcntl.h>
-#include "doseAdmin.h"
+#include "../Shared/doseAdmin.h"
 #include "CentralAcquisitionProxy.h"
-
+#include <string.h>
 
 typedef enum {
 	NOT_CONNECTED_WITH_CENTRAL_ACQUISITION, 
@@ -14,6 +14,11 @@ typedef enum {
 int main(int argc, char* argv[])
 {
 	static CENTRAL_ACQUISITION_CONNECTION_STATE centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
+		
+	init_hash_table();
+
+	hash_table_insert("JohnDoe", 0, 0);
+	
 	if (connectWithCentralAcquisition()) {	
 		centralAcqConnectionState = CONNECTED_WITH_CENTRAL_ACQUISITION;
 	}
@@ -21,12 +26,8 @@ int main(int argc, char* argv[])
 		printf("\n\nConnecting with CentralAcquisition Failed. No problem, you can continue with \n");
 		printf("the functionality that does not depend on that connection!\n");
 	}
-	
+
 	fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);   //non blocking standard input
-	 
-	char selectedPatient[MAX_PATIENTNAME_SIZE] = "JohnDoe";
-	(void) selectedPatient; // remove this line when you are doing something with selectedPatient
-	// add here the code that adds John Doe into the admin
 	
 	displayMenu();	
 	while (true) {  
@@ -35,40 +36,89 @@ int main(int argc, char* argv[])
 			if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
 				uint32_t doseData;
 				if (getDoseDataFromCentralAcquisition(&doseData)) {
-					printf("Received dose: %d\n", doseData); // instead of this print call here the function that handles the received dose datawqt
+					printf("Received dose: %d\n", doseData); // instead of this print call here the function that handles the received dose datat
 				}
 			}
 		}
 		else {
 			switch (choice)
 			{
-			case MO_ADD_PATIENT:
-				// add here your add patient code
-				break;
-			case MO_DELETE_PATIENT:
-				// add here your delete patient code
-				break;
-			case MO_SELECT_PATIENT:
-				// add here your select patient code
-				break;
-			case MO_SELECT_EXAMINATION_TYPE:
-			    if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {	
-					// add here your select examination code
+				case MO_ADD_PATIENT:{
+					char name[MAX_NAME - 1];
+					int age;
+					int dose;
+
+					printf("Enter Patient Name: ");
+					if (scanf("%79s", name) != 1){
+						printf("ERROR: Invalid Input.");
+						break;
+					}
+				
+					printf("Enter Patient Age: ");
+					if (scanf("%i", &age) != 1){
+						printf("ERROR: Invalid Input.");
+						break;
+					}
+
+					printf("Enter Patient Dose: ");
+					if (scanf("%i", &dose) != 1){
+						printf("ERROR: Invalid Input.");
+						break;
+					}
+
+					if (hash_table_insert(name, age, dose) == 1) {
+						printf("Patient %s added successfully.\n", name);
+					} else {
+						printf("ERROR: Could not add patient.\n");
+					}
+					break;
 				}
-				else {
-					printf("This option is only valid when connected with CentralAcquisition\n");
+				
+				case MO_VIEW_TABLE:{
+					printf("----- DATABASE DEBUGGING INFOMATION -----");
+					print_table();
+					break;
 				}
-				break;
-			case MO_QUIT:
-				if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
-					disconnectFromCentralAcquisition();
+
+				case MO_DELETE_PATIENT:{
+					char name[MAX_NAME - 1];
+					printf("Enter name to remove: ");
+					scanf("%79s\n", name);
+					RemovePatient(name);
+
+					if (RemovePatient(name) == -1){
+						printf("ERROR: Remove Patient Failed");
+						break;
+					} else {
+						printf("Removing Patient ""%s"" Success", name);
+					}
+					break;
 				}
-				centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
-				return 0;
-				break;
-			default:
-				printf("Please, enter a valid number! %d\n", choice);
-				break;
+				case MO_SELECT_PATIENT:{
+					// add here your select patient code
+					break;
+				}
+				case MO_SELECT_EXAMINATION_TYPE:{
+					if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {	
+						// add here your select examination code
+					}
+					else {
+						printf("This option is only valid when connected with CentralAcquisition\n");
+					}
+					break;
+				}
+				case MO_QUIT:{
+					if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
+						disconnectFromCentralAcquisition();
+					}
+					centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
+					return 0;
+					break;
+				}
+				default:{
+					printf("Please, enter a valid number! %d\n", choice);
+					break;
+				}
 			}
 			displayMenu();
 		}

@@ -3,35 +3,53 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h> // for line 15 and 41
+#include <stdbool.h>
+#include <ctype.h> // for disabling cap sensitivity
 
-#define MAX_NAME	(80)
-#define TABLE_SIZE  (256)
+#define MAX_NAME	80
+#define TABLE_SIZE  255
 
 typedef struct{ //struct is a group of variables, typedef is for initializing a variable (type)
     char name[MAX_NAME];
     int age;
     int dosage;
     // can add more later
-} person;
+} patient; 
 
-person * hash_table[TABLE_SIZE];
+typedef struct {
+	uint8_t   day;    // value in range [1, 31]
+	uint8_t   month;  // value in range [1, 12]
+	uint16_t  year;   // value in range [1900, 2500]
+} Date;
+
+patient hash_table[TABLE_SIZE]; // Use : patient hash_table[TABLE_SIZE];
+
+unsigned int hash(char *name);
 
 
 /*************************************************************************************** 
  * Creates and initializes the patient dose administration. No patient data will be 
  * present after creation
  *  
- */
-void init_hash_table(); 
-					   
-
-/***************************************************************************************
+ **************************************************************************************
  * Removes all patient data from the administration, but remark that JohnDoe must remain
  * present (with no dose data)
  * 
  */
-void RemoveAllDataFromPatientDoseAdmin();
+void init_hash_table();
 
+/**************************************************************************************
+ * Print the whole table for debugging
+ * ************************************************************************************
+ */
+void print_table();
+
+/**************************************************************************************
+ * Changes characters to lowercase for searching
+ * ************************************************************************************
+ */
+void to_lowercase(char *string);
 
 /***************************************************************************************
  * Adds the patient in the administration
@@ -43,7 +61,42 @@ void RemoveAllDataFromPatientDoseAdmin();
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int8_t hash_table_insert(person *p);
+int8_t hash_table_insert(char *name, int age, int dosage);
+
+/***************************************************************************************
+ * Removes the patient from the administration
+ * 
+ * Returns -1 when the passed patientName is not present 
+ * Returns -2 when string length of patientName exceeds MAX_PATIENTNAME_SIZE
+ * Returns  0 when the patient data is successfully removed from the administration
+ * 
+ * It is a precondition that patientName is not NULL and is \0 terminated
+ */
+int8_t RemovePatient(char *name);
+
+/***************************************************************************************
+ * Selects the patient as the active patient (selected patient)
+ *
+ * Returns -1 when the passed patientName is not present 
+ * Returns -2 when string length of patientName exceeds MAX_PATIENTNAME_SIZE
+ * Returns  0 when the patient is successfully selected
+ * 
+ * It is a precondition that patientName is not NULL and is \0 terminated
+ */
+int16_t IsPatientPresent(char * name);
+
+/***************************************************************************************
+ * Checks if the passed patientName is present in the administration
+ * 
+ * Returns -1 when the passed patientName is not present 
+ * Returns -2 when string length of patientName exceeds MAX_PATIENTNAME_SIZE
+ * Returns 0 when the patientName is present
+ * 
+ * It is a precondition that patientName is not NULL and is \0 terminated
+ */
+
+
+void display_patient_details(int16_t index);
 
 
 /***************************************************************************************
@@ -55,14 +108,18 @@ int8_t hash_table_insert(person *p);
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-person *hash_table_lookup (char *name);
+//FUNCTION MISSING
 
 
-typedef struct {
-	uint8_t   day;    // value in range [1, 31]
-	uint8_t   month;  // value in range [1, 12]
-	uint16_t  year;   // value in range [1900, 2500]
-} Date;
+void handle_patient_selection();
+
+
+
+					   
+//void RemoveAllDataFromPatientDoseAdmin();
+
+
+
 
 /***************************************************************************************
  * Adds the dose a patient received during an examination at a particular date in 
@@ -75,7 +132,7 @@ typedef struct {
  * It is also a precondition that date is not NULL
  * It is also a precondition that dose is not 0
  */
-int8_t AddPatientDose(Date* date, uint16_t dose);
+//int8_t AddPatientDose(Date* date, uint16_t dose);
 
 
 /***************************************************************************************
@@ -88,32 +145,8 @@ int8_t AddPatientDose(Date* date, uint16_t dose);
  * It is a precondition that patientName is not NULL and is \0 terminated
  * It is also a precondition that both dates and totalDose are not NULL
  */
-int8_t PatientDoseInPeriod(char * patientName, 
-                           Date* startDate, Date* endDate, uint32_t* totalDose);
-
-
-/***************************************************************************************
- * Removes the patient from the administration
- * 
- * Returns -1 when the passed patientName is not present 
- * Returns -2 when string length of patientName exceeds MAX_PATIENTNAME_SIZE
- * Returns  0 when the patient data is successfully removed from the administration
- * 
- * It is a precondition that patientName is not NULL and is \0 terminated
- */
-person *hash_table_remove (char *name);
-
-
-/***************************************************************************************
- * Checks if the passed patientName is present in the administration
- * 
- * Returns -1 when the passed patientName is not present 
- * Returns -2 when string length of patientName exceeds MAX_PATIENTNAME_SIZE
- * Returns 0 when the patientName is present
- * 
- * It is a precondition that patientName is not NULL and is \0 terminated
- */
-int8_t IsPatientPresent(char * patientName);
+//int8_t PatientDoseInPeriod(char * patientName, 
+//                           Date* startDate, Date* endDate, uint32_t* totalDose);
 
 
 /***************************************************************************************
@@ -125,8 +158,8 @@ int8_t IsPatientPresent(char * patientName);
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int8_t GetNumberOfMeasurements(char * patientName, 
-                               size_t * nrOfMeasurements);
+//int8_t GetNumberOfMeasurements(char * patientName, 
+//                               size_t * nrOfMeasurements);
 								
 
 /***************************************************************************************
@@ -135,7 +168,7 @@ int8_t GetNumberOfMeasurements(char * patientName,
  * Returns 0 on success
  * Returns -1 on faillure
  */
-int8_t WriteToFile(char * filePath);
+//int8_t WriteToFile(char * filePath);
 
 
 
@@ -145,6 +178,6 @@ int8_t WriteToFile(char * filePath);
  * Returns 0 on success
  * Returns -1 on faillure
  */
-int8_t ReadFromFile(char * filePath);
+//int8_t ReadFromFile(char * filePath);
 
 #endif
