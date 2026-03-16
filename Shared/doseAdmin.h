@@ -23,26 +23,22 @@ typedef struct {
 	uint16_t  year;   // value in range [1900, 2500]
 } Date;
 
-patient hash_table[TABLE_SIZE]; // Use : patient hash_table[TABLE_SIZE];
+extern patient hash_table[TABLE_SIZE]; // Use : patient hash_table[TABLE_SIZE]; Extern so all files get the same copy of the table
 
 unsigned int hash(char *name);
 
-
-/*************************************************************************************** 
- * Creates and initializes the patient dose administration. No patient data will be 
- * present after creation
- *  
- **************************************************************************************
- * Removes all patient data from the administration, but remark that JohnDoe must remain
- * present (with no dose data)
- * 
- */
+/*
+* Initialize the hash table (clear all entries)
+*/
 void init_hash_table();
 
-/**************************************************************************************
- * Print the whole table for debugging
- * ************************************************************************************
- */
+
+
+bool hash_table_insert(char *name, int age, int dosage);
+
+/*
+* Print all patients in the hash table (for debugging)
+*/
 void print_table();
 
 /**************************************************************************************
@@ -50,18 +46,6 @@ void print_table();
  * ************************************************************************************
  */
 void to_lowercase(char *string);
-
-/***************************************************************************************
- * Adds the patient in the administration
- *
- * Returns -1 when the passed patientName is already present 
- * Returns -2 when allocation of memory failed
- * Returns -3 when string length of patientName exceeds MAX_PATIENTNAME_SIZE
- * Returns  0 when the patient is successfully added
- * 
- * It is a precondition that patientName is not NULL and is \0 terminated
- */
-int8_t hash_table_insert(char *name, int age, int dosage);
 
 /***************************************************************************************
  * Removes the patient from the administration
@@ -108,11 +92,7 @@ void display_patient_details(int16_t index);
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-//FUNCTION MISSING
-
-
-void handle_patient_selection();
-
+void SelectPatient(char *name);
 
 
 					   

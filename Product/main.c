@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include "menu.h"
-#include <fcntl.h>
-#include "../Shared/doseAdmin.h"
-#include "CentralAcquisitionProxy.h"
 #include <string.h>
+#include <fcntl.h>
+#include "menu.h"
+#include "CentralAcquisitionProxy.h"
+#include "../Shared/doseAdmin.h"
 
 typedef enum {
 	NOT_CONNECTED_WITH_CENTRAL_ACQUISITION, 
@@ -26,8 +26,6 @@ int main(int argc, char* argv[])
 		printf("\n\nConnecting with CentralAcquisition Failed. No problem, you can continue with \n");
 		printf("the functionality that does not depend on that connection!\n");
 	}
-
-	fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);   //non blocking standard input
 	
 	displayMenu();	
 	while (true) {  
@@ -43,25 +41,31 @@ int main(int argc, char* argv[])
 		else {
 			switch (choice)
 			{
+				case MO_VIEW_TABLE:{
+					printf("----- DATABASE DEBUGGING INFOMATION -----\n");
+					print_table();
+					break;
+				}
+
 				case MO_ADD_PATIENT:{
-					char name[MAX_NAME - 1];
+					char name[MAX_NAME];
 					int age;
 					int dose;
-
-					printf("Enter Patient Name: ");
+					
+					printf("Enter Patient Name: ");					
 					if (scanf("%79s", name) != 1){
 						printf("ERROR: Invalid Input.");
 						break;
 					}
-				
+					
 					printf("Enter Patient Age: ");
-					if (scanf("%i", &age) != 1){
+					if (scanf("%d", &age) != 1){
 						printf("ERROR: Invalid Input.");
 						break;
 					}
 
 					printf("Enter Patient Dose: ");
-					if (scanf("%i", &dose) != 1){
+					if (scanf("%d", &dose) != 1){
 						printf("ERROR: Invalid Input.");
 						break;
 					}
@@ -73,31 +77,38 @@ int main(int argc, char* argv[])
 					}
 					break;
 				}
-				
-				case MO_VIEW_TABLE:{
-					printf("----- DATABASE DEBUGGING INFOMATION -----");
-					print_table();
+
+				case MO_SELECT_PATIENT:{
+					// add here your select patient code
+					char name[MAX_NAME];
+					printf("Enter name to select patient:\t");
+					if (scanf("%79s",name) != 1){
+						printf("ERROR: Invalid Input.");
+						break;
+					}
+
+					SelectPatient(name);
+
 					break;
 				}
 
 				case MO_DELETE_PATIENT:{
-					char name[MAX_NAME - 1];
+					char name[MAX_NAME];
 					printf("Enter name to remove: ");
-					scanf("%79s\n", name);
-					RemovePatient(name);
+					if (scanf("%79s", name) != 1) {
+						printf("ERROR: Invalid Input.");
+						break;
+					}
 
 					if (RemovePatient(name) == -1){
 						printf("ERROR: Remove Patient Failed");
 						break;
 					} else {
-						printf("Removing Patient ""%s"" Success", name);
+						printf("Removing Patient (%s) Success", name);
 					}
 					break;
 				}
-				case MO_SELECT_PATIENT:{
-					// add here your select patient code
-					break;
-				}
+				
 				case MO_SELECT_EXAMINATION_TYPE:{
 					if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {	
 						// add here your select examination code

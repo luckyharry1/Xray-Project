@@ -3,13 +3,15 @@
 #include "../Shared/doseAdmin.h"
 
 typedef enum {
-	MO_ADD_PATIENT,
 	MO_VIEW_TABLE,
-	MO_DELETE_PATIENT,
+	MO_ADD_PATIENT,
 	MO_SELECT_PATIENT,
+	MO_DELETE_PATIENT,
 	MO_SELECT_EXAMINATION_TYPE,
     MO_QUIT
 } MenuOptions;
+
+void handle_patient_selection(int8_t index);
 
 MenuOptions getMenuChoice(void);
 void displayMenu();
