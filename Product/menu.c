@@ -3,20 +3,20 @@
 #include <stdint.h>
 #include <fcntl.h>
 
+void printDosage();
+
+void handlePatientSelection(int8_t index);
 
 static int getInt();
 
 static const char* MenuStrings[] = {
     "View Table Data",
     "Add Patient",
-//    "View Patient Data",
     "Select Patient",
     "Delete Patient",
     "Select Examination Type", 
     "Quit"
 };
-
-void handle_patient_selection(int8_t index);
 
 MenuOptions getMenuChoice(void)
 { 
@@ -27,7 +27,7 @@ void displayMenu()
 {
 	size_t NrMenuStrings = sizeof(MenuStrings) / sizeof(MenuStrings[0]);
 	
-	printf("\nMENU\n");
+	printf("\n\t------Menu-----\t\n");
 	for (int i = 0; i < NrMenuStrings; i++) printf("  [%d] %s\n", i, MenuStrings[i]);
 	printf("choice: ");
 }
@@ -45,25 +45,22 @@ static int getInt()
     return value;
 }
 
+void handlePatientSelection(int8_t index) {
+    bool validInput = false;
+    while (validInput == false){
 
-void handle_patient_selection(int8_t index) {
-    char name[MAX_NAME];
-
-    bool valid_input = false;
-    while (valid_input == false){
-
-        int name_function_input;
-        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Remove User\n3. Exit\n", hash_table[index].name);
-        scanf("%i", &name_function_input);
-        switch(name_function_input){
+        int nameFunctionInput;
+        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Remove User\n3. Exit\n", hashTable[index].name);
+        scanf("%i", &nameFunctionInput);
+        switch(nameFunctionInput){
             case(1):
                 printf("\n  --- Patient Details ---\n");
-                printf("\tName: %s\n", hash_table[index].name);
-                printf("\tAge: %d\n", hash_table[index].age);
-                printf("\tDosage: %d\n\n", hash_table[index].dosage);
+                printf("\tName: %s\n", hashTable[index].name);
+                printf("\tAge: %d\n", hashTable[index].age);
+                printDosage(index);
                 break;
             case(2):
-                if (RemovePatient(name) == 0){
+                if (removePatient(hashTable[index].name) == 0){
                     printf("Remove patient success\n");
                     return;
                 }
@@ -75,3 +72,13 @@ void handle_patient_selection(int8_t index) {
     }
 
 }
+
+void printDosage(index){
+    printf(" --------------------------------------\n");
+    printf("|\t\t\t\t\t|\n");
+    printf("|\t\t\t\t\t|\n");
+    printf("|\t\tDosage: %d\t\t|\n", hashTable[index].dosage);
+    printf("|\t\t\t\t\t|\n");
+    printf("|\t\t\t\t\t|\n");
+    printf(" --------------------------------------\n");
+    }

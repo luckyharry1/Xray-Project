@@ -15,9 +15,7 @@ int main(int argc, char* argv[])
 {
 	static CENTRAL_ACQUISITION_CONNECTION_STATE centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
 		
-	init_hash_table();
-
-	hash_table_insert("JohnDoe", 0, 0);
+	initHashTable();
 	
 	if (connectWithCentralAcquisition()) {	
 		centralAcqConnectionState = CONNECTED_WITH_CENTRAL_ACQUISITION;
@@ -43,7 +41,7 @@ int main(int argc, char* argv[])
 			{
 				case MO_VIEW_TABLE:{
 					printf("----- DATABASE DEBUGGING INFOMATION -----\n");
-					print_table();
+					printTable();
 					break;
 				}
 
@@ -53,7 +51,7 @@ int main(int argc, char* argv[])
 					int dose;
 					
 					printf("Enter Patient Name: ");					
-					if (scanf("%79s", name) != 1){
+					if (scanf("%s", name) != 1){
 						printf("ERROR: Invalid Input.");
 						break;
 					}
@@ -69,8 +67,8 @@ int main(int argc, char* argv[])
 						printf("ERROR: Invalid Input.");
 						break;
 					}
-
-					if (hash_table_insert(name, age, dose) == 1) {
+					
+					if (hashTableInsert(name, age) && addPatientDose(dose) == 1) {
 						printf("Patient %s added successfully.\n", name);
 					} else {
 						printf("ERROR: Could not add patient.\n");
@@ -80,14 +78,7 @@ int main(int argc, char* argv[])
 
 				case MO_SELECT_PATIENT:{
 					// add here your select patient code
-					char name[MAX_NAME];
-					printf("Enter name to select patient:\t");
-					if (scanf("%79s",name) != 1){
-						printf("ERROR: Invalid Input.");
-						break;
-					}
-
-					SelectPatient(name);
+					selectPatient();
 
 					break;
 				}
@@ -95,12 +86,12 @@ int main(int argc, char* argv[])
 				case MO_DELETE_PATIENT:{
 					char name[MAX_NAME];
 					printf("Enter name to remove: ");
-					if (scanf("%79s", name) != 1) {
+					if (scanf("%s", name) != 1) {
 						printf("ERROR: Invalid Input.");
 						break;
 					}
 
-					if (RemovePatient(name) == -1){
+					if (removePatient(name) == -1){
 						printf("ERROR: Remove Patient Failed");
 						break;
 					} else {

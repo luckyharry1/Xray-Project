@@ -18,34 +18,32 @@ typedef struct{ //struct is a group of variables, typedef is for initializing a 
 } patient; 
 
 typedef struct {
-	uint8_t   day;    // value in range [1, 31]
-	uint8_t   month;  // value in range [1, 12]
-	uint16_t  year;   // value in range [1900, 2500]
-} Date;
+	uint8_t day;    // value in range [1, 31]
+	uint8_t month;  // value in range [1, 12]
+	uint16_t year;   // value in range [1900, 2500]
+} date;
 
-extern patient hash_table[TABLE_SIZE]; // Use : patient hash_table[TABLE_SIZE]; Extern so all files get the same copy of the table
+extern patient hashTable[TABLE_SIZE]; // Use : patient hash_table[TABLE_SIZE]; Extern so all files get the same copy of the table
 
 unsigned int hash(char *name);
 
 /*
 * Initialize the hash table (clear all entries)
 */
-void init_hash_table();
+void initHashTable();
 
-
-
-bool hash_table_insert(char *name, int age, int dosage);
+bool hashTableInsert(char *name, int age);
 
 /*
 * Print all patients in the hash table (for debugging)
 */
-void print_table();
+void printTable();
 
 /**************************************************************************************
  * Changes characters to lowercase for searching
  * ************************************************************************************
  */
-void to_lowercase(char *string);
+void toLowercase(char *string);
 
 /***************************************************************************************
  * Removes the patient from the administration
@@ -56,7 +54,7 @@ void to_lowercase(char *string);
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int8_t RemovePatient(char *name);
+int8_t removePatient(char *name);
 
 /***************************************************************************************
  * Selects the patient as the active patient (selected patient)
@@ -67,7 +65,8 @@ int8_t RemovePatient(char *name);
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int16_t IsPatientPresent(char * name);
+void selectPatient();
+
 
 /***************************************************************************************
  * Checks if the passed patientName is present in the administration
@@ -78,26 +77,7 @@ int16_t IsPatientPresent(char * name);
  * 
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-
-
-void display_patient_details(int16_t index);
-
-
-/***************************************************************************************
- * Selects the patient as the active patient (selected patient)
- *
- * Returns -1 when the passed patientName is not present 
- * Returns -2 when string length of patientName exceeds MAX_PATIENTNAME_SIZE
- * Returns  0 when the patient is successfully selected
- * 
- * It is a precondition that patientName is not NULL and is \0 terminated
- */
-void SelectPatient(char *name);
-
-
-					   
-//void RemoveAllDataFromPatientDoseAdmin();
-
+int16_t isPatientPresent(char * name);
 
 
 
