@@ -97,20 +97,20 @@ static bool getMsgFromCentralAcquisition(char msg[MAX_MSG_SIZE])
 
 static bool setupSerialConnection()
 {
-	int ACMNumber = 0;
+	int USBNumber = 0;
 	int tryCount = 0;
 	const int maxTryCount = 50;
 	
 	printf("Setting up serial connection...  ");
 	do {	
 		char ttyName[30];
-		sprintf(ttyName, "/dev/ttyACM%d", ACMNumber); 
+		sprintf(ttyName, "/dev/ttyUSB%d", USBNumber); 
 		if (setupSerialPort(ttyName) == 0) {	
 			printf("  ...connected with %s\n", ttyName);
 			return true;
 		}
 		else {
-			ACMNumber++;
+			USBNumber++;
 			tryCount++;
 		}
 	} while (tryCount < maxTryCount);

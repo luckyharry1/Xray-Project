@@ -1,7 +1,7 @@
 #include <Arduino.h>
-//#include <stdint.h>
+#include <stdint.h>
 #include <string.h>
-//#include <stdbool.h>
+#include <stdbool.h>
 #include "../../Interface_PatAdmin_CentralAcq/Protocol_PatientAdmin_CentralAcq.h"
 
 typedef enum {
@@ -19,6 +19,10 @@ typedef enum {
 	WAITING_FOR_MSG_START_SYMBOL, 
 	WAITING_FOR_MSG_END_SYMBOL
 } MSG_RECEIVE_STATE;
+
+// Forward declarations
+static bool writeMsgToSerialPort(const char msg[MAX_MSG_SIZE]);
+bool checkForMsgOnSerialPort(char recieved_msg[MAX_MSG_SIZE]);
 
 void handleEvent(EVENTS event) //Check state and handle incoming events
 {
@@ -56,16 +60,11 @@ EVENTS getEvent() //Only checks whether a connect/disconnect message is recieved
     return EV_NONE;
 }
 
-EVENTS getEvent();{ //Then calls the other functions to write and recieve
-    void handleEvent(EVENTS event);
-    static bool writeMsgToSerialPort(const char msg[MAX_MSG_SIZE]);
-    bool checkForMsgOnSerialPort(char recieved_msg[MAX_MSG_SIZE]);
-}
 
 static bool writeMsgToSerialPort(const char msg[MAX_MSG_SIZE]) //Write a string array to the serial port
 {
 	Serial.write(MSG_START_SYMBOL);
-    for(unsigned int i = 0; ) (i < MAX_MSG_SIZE && msg[i] != '\0'; i++) {
+    for (unsigned int i = 0; i < MAX_MSG_SIZE && msg[i] != '\0'; i++) {
 		Serial.write(msg[i]);
 	}
 	Serial.write(MSG_END_SYMBOL);
@@ -75,11 +74,13 @@ static bool writeMsgToSerialPort(const char msg[MAX_MSG_SIZE]) //Write a string 
 bool checkForMsgOnSerialPort(char recieved_msg[MAX_MSG_SIZE])
 {
     static int receiveIndex = 0;
-    if (recieveindex < MAX_MSG_SIZE - 1){
-        exit(0);
-    }
     static MSG_RECEIVE_STATE msgRcvState = WAITING_FOR_MSG_START_SYMBOL;
     static char msg[MAX_MSG_SIZE] {0};
+
+    if (receiveIndex >= MAX_MSG_SIZE - 1) {
+        receiveIndex = 0;
+        msgRcvState = WAITING_FOR_MSG_START_SYMBOL;
+    }
 
     if (Serial.available() > 0) {
         char receivedChar = Serial.read(); 
@@ -115,12 +116,12 @@ void loop() {
     handleEvent(getEvent());
 
     // below some dummy code that sends dose data to the patient admin. Remove this dummy code asap.
-    /*static unsigned long timeOut = millis();
+    static unsigned long timeOut = millis();
     static int doseCnt = 0;
     unsigned long curTime = millis();
     if (curTime > timeOut) {
         Serial.print("$dose:"); Serial.print(doseCnt); Serial.println("#");
         timeOut = curTime + 5000;
         doseCnt++;
-    }*/
+    }
 }

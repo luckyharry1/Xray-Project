@@ -11,9 +11,9 @@ typedef enum {
     MO_QUIT
 } MenuOptions;
 
-void printDosage(index);
+void printDosage(int index);
 
-void handlePatientSelection(int8_t index);
+void handlePatientSelection(int index);
 
 MenuOptions getMenuChoice(void);
 void displayMenu();

@@ -3,9 +3,9 @@
 #include <stdint.h>
 #include <fcntl.h>
 
-void printDosage();
+void printDosage(int index);
 
-void handlePatientSelection(int8_t index);
+void handlePatientSelection(int index);
 
 static int getInt();
 
@@ -45,22 +45,22 @@ static int getInt()
     return value;
 }
 
-void handlePatientSelection(int8_t index) {
+void handlePatientSelection(int index) {
     bool validInput = false;
     while (validInput == false){
 
         int nameFunctionInput;
-        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Remove User\n3. Exit\n", hashTable[index].name);
+        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Remove User\n3. Exit\n", hashTable[index]->name);
         scanf("%i", &nameFunctionInput);
         switch(nameFunctionInput){
             case(1):
                 printf("\n  --- Patient Details ---\n");
-                printf("\tName: %s\n", hashTable[index].name);
-                printf("\tAge: %d\n", hashTable[index].age);
+                printf("\tName: %s\n", hashTable[index]->name);
+                printf("\tAge: %d\n", hashTable[index]->age);
                 printDosage(index);
                 break;
             case(2):
-                if (removePatient(hashTable[index].name) == 0){
+                if (removePatient(hashTable[index]->name) == 0){
                     printf("Remove patient success\n");
                     return;
                 }
@@ -73,12 +73,21 @@ void handlePatientSelection(int8_t index) {
 
 }
 
-void printDosage(index){
-    printf(" --------------------------------------\n");
-    printf("|\t\t\t\t\t|\n");
-    printf("|\t\t\t\t\t|\n");
-    printf("|\t\tDosage: %d\t\t|\n", hashTable[index].dosage);
-    printf("|\t\t\t\t\t|\n");
-    printf("|\t\t\t\t\t|\n");
-    printf(" --------------------------------------\n");
-    }
+void handleAddDosage(){
+    int dose;
+    int day; int month; int year;
+    printf("How large of a dose would you like to add (in mg)?\n");
+    scanf("%d\n", dose);
+    printf("Please fill in today's date (dd/mm/yyyy).\nType in the date and press enter.\n");
+    scanf("%d",day);
+    printf("/");
+    scanf("%d",month);
+    printf("/");
+    scanf("%d",year);
+    printf("/");
+}
+
+void printDosage(int index){
+    // TODO: implement when dosage field is added to patient struct
+    (void)index;
+}

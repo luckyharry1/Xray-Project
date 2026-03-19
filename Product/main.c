@@ -32,7 +32,7 @@ int main(int argc, char* argv[])
 			if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
 				uint32_t doseData;
 				if (getDoseDataFromCentralAcquisition(&doseData)) {
-					printf("Received dose: %d\n", doseData); // instead of this print call here the function that handles the received dose datat
+					printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
 				}
 			}
 		}
@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
 						break;
 					}
 					
-					if (hashTableInsert(name, age) && addPatientDose(dose) == 1) {
+					if (hashTableInsert(name, age) == true) {
 						printf("Patient %s added successfully.\n", name);
 					} else {
 						printf("ERROR: Could not add patient.\n");
@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
 						break;
 					}
 
-					if (removePatient(name) == -1){
+					if (removePatient(name) == false){
 						printf("ERROR: Remove Patient Failed");
 						break;
 					} else {
@@ -115,10 +115,9 @@ int main(int argc, char* argv[])
 					}
 					centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
 					return 0;
-					break;
 				}
 				default:{
-					printf("Please, enter a valid number! %d\n", choice);
+					printf("Please enter a valid option (0-%d).\n", MO_QUIT);
 					break;
 				}
 			}
