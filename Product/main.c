@@ -25,16 +25,19 @@ int main(int argc, char* argv[])
 		printf("the functionality that does not depend on that connection!\n");
 	}
 	
+	//fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);   //non blocking standard input
+
+	
 	displayMenu();	
 	while (true) {  
         MenuOptions choice = getMenuChoice();
 		if (choice == -1) {
-			if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
-				uint32_t doseData;
-				if (getDoseDataFromCentralAcquisition(&doseData)) {
-					printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
-				}
-			}
+		//	if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
+		//		uint32_t doseData;
+		//		if (getDoseDataFromCentralAcquisition(&doseData)) {
+		//			printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
+		//		}
+		//	}
 		}
 		else {
 			switch (choice)
@@ -47,40 +50,51 @@ int main(int argc, char* argv[])
 
 				case MO_ADD_PATIENT:{
 					char name[MAX_NAME];
-					int age;
-					int dose;
 					
-					printf("Enter Patient Name: ");					
+					printf("Enter Patient Name: (type 0 to cancel) ");					
 					if (scanf("%s", name) != 1){
 						printf("ERROR: Invalid Input.");
 						break;
 					}
+					if (name[0] == 0){
+						return 0;
+					}
+					switch (hashTableInsert(name))
+					{
+					case 0:
+						printf("Patient %s added successfully.\n", name);
+						break;
+					case -1:
+						break;
+					case -2:
+						printf("ERROR: PLACE IS TAKEN");
+						break;
+					case -3:
+						printf("ERROR: MEMORY HEAP FULL");
+						break;
 					
-					printf("Enter Patient Age: ");
-					if (scanf("%d", &age) != 1){
-						printf("ERROR: Invalid Input.");
+					default:
+						
 						break;
 					}
 
-					printf("Enter Patient Dose: ");
-					if (scanf("%d", &dose) != 1){
+				}
+
+				case MO_MANAGE_PATIENT:{
+					char name[MAX_NAME];
+					printf("Enter name to manage patient: ");
+					if (scanf("%s", name) != 1){
 						printf("ERROR: Invalid Input.");
-						break;
+						return;
 					}
-					
-					if (hashTableInsert(name, age) == true) {
-						printf("Patient %s added successfully.\n", name);
-					} else {
-						printf("ERROR: Could not add patient.\n");
-					}
+					managePatient(name);
+
 					break;
 				}
 
 				case MO_SELECT_PATIENT:{
 					// add here your select patient code
-					selectPatient();
-
-					break;
+					
 				}
 
 				case MO_DELETE_PATIENT:{
@@ -102,7 +116,12 @@ int main(int argc, char* argv[])
 				
 				case MO_SELECT_EXAMINATION_TYPE:{
 					if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {	
-						// add here your select examination code
+						//void selectExaminationType(const EXAMINATION_TYPES examination);
+						uint32_t doseData;
+						if (getDoseDataFromCentralAcquisition(&doseData)) {
+							printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
+						}
+						selectExaminationType(EXAM_TYPE_SINGLE_SHOT);
 					}
 					else {
 						printf("This option is only valid when connected with CentralAcquisition\n");

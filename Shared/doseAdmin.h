@@ -9,49 +9,49 @@
 
 #define MAX_NAME	80
 #define TABLE_SIZE  256
-
 #define MAX_DOSE_MEASUREMENTS 10
 
-/*typedef struct {
+typedef struct {
 	uint8_t day;    // value in range [1, 31]
 	uint8_t month;  // value in range [1, 12]
 	uint16_t year;  // value in range [1900, 2500]
-} date;*/
+} Date;
 
 typedef struct{
     uint16_t dosage; //dose in mg
-    char date[11];
+    Date date;
 } doseData;
 
 typedef struct {
     char name[MAX_NAME];
-    int age;
-    doseData* doses[MAX_DOSE_MEASUREMENTS];    // dynamically allocated array of dose records
+    doseData* doseData[MAX_DOSE_MEASUREMENTS];    // dynamically allocated array of dose records
     int doseCount;
 } patient;
 
 extern patient* hashTable[TABLE_SIZE]; // NULL = empty slot
-extern int selectedPatientIndex;      // -1 when no patient is selected
 
-unsigned int hash(char *name);
+//unsigned int hash(char *name);
 
 /*
 * Initialize the hash table (clear all entries)
 */
 void initHashTable();
 
-bool hashTableInsert(char *name, int age);
+bool hashTableInsert(char *name);
 
+void managePatient();
 /*
 * Print all patients in the hash table (for debugging)
 */
 void printTable();
 
+void printPatientData(index);
+
 /**************************************************************************************
  * Changes characters to lowercase for searching
  * ************************************************************************************
  */
-void toLowercase(char *string);
+//void toLowercase(char *string);
 
 /***************************************************************************************
  * Removes the patient from the administration
@@ -61,14 +61,17 @@ void toLowercase(char *string);
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int8_t removePatient(char *name);
+bool removePatient(char *name);
 
 /***************************************************************************************
  * Selects the patient as the active patient (selected patient)
  *
+ * -1 not present
+ * -2 when strlen is too much
+ * 0 if pass
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-void selectPatient();
+int8_t selectPaitent();
 
 
 /***************************************************************************************
@@ -79,10 +82,8 @@ void selectPatient();
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int16_t isPatientPresent(char * name);
+//int16_t isPatientPresent(char * name);
 
-/* Forward declaration to avoid circular include with menu.h */
-void handlePatientSelection(int index);
 
 
 /***************************************************************************************
@@ -92,7 +93,7 @@ void handlePatientSelection(int index);
  * Returns -1 when no patient is selected or allocation failed
  * Returns  0 when the data is successfully added
  */
-int8_t addPatientDose(uint16_t date, uint16_t dosage);
+int8_t addPatientDose(uint8_t index, uint8_t day, uint8_t month, uint16_t year, uint16_t dosage);
 
 
 /***************************************************************************************
@@ -125,7 +126,7 @@ int8_t addPatientDose(uint16_t date, uint16_t dosage);
  * Returns 0 on success
  * Returns -1 on failure
  */
-int8_t writeToFile(char * filePath);
+//int8_t writeToFile(char * filePath);
 
 
 /***************************************************************************************
@@ -134,6 +135,6 @@ int8_t writeToFile(char * filePath);
  * Returns 0 on success
  * Returns -1 on failure
  */
-int8_t readFromFile(char * filePath);
+//int8_t readFromFile(char * filePath);
 
 #endif

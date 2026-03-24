@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include "../../Interface_PatAdmin_CentralAcq/Protocol_PatientAdmin_CentralAcq.h"
 
+#define LED 6
+
 typedef enum {
 	EV_CONNECT_MSG_RECEIVED, 
 	EV_DISCONNECT_MSG_RECEIVED, 
@@ -55,6 +57,9 @@ EVENTS getEvent() //Only checks whether a connect/disconnect message is recieved
         }
         else if (strcmp(msg, DISCONNECT_MSG) == 0){
             return EV_DISCONNECT_MSG_RECEIVED;
+        }
+        else if (msg == "EXAM1"){
+            analogWrite(LED, 255);
         }
     }
     return EV_NONE;
@@ -110,10 +115,12 @@ bool checkForMsgOnSerialPort(char recieved_msg[MAX_MSG_SIZE])
 
 void setup() {
   Serial.begin(9600);
+  pinMode(LED, OUTPUT);
 }
 
 void loop() {
     handleEvent(getEvent());
+
 
     // below some dummy code that sends dose data to the patient admin. Remove this dummy code asap.
     static unsigned long timeOut = millis();

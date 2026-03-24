@@ -12,6 +12,7 @@ static int getInt();
 static const char* MenuStrings[] = {
     "View Table Data",
     "Add Patient",
+    "Manage Patient",
     "Select Patient",
     "Delete Patient",
     "Select Examination Type", 
@@ -45,22 +46,19 @@ static int getInt()
     return value;
 }
 
-void handlePatientSelection(int index) {
+void handlePatientSelection(name) {
     bool validInput = false;
     while (validInput == false){
 
         int nameFunctionInput;
-        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Remove User\n3. Exit\n", hashTable[index]->name);
+        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Remove User\n3. Exit\n", name);
         scanf("%i", &nameFunctionInput);
         switch(nameFunctionInput){
             case(1):
-                printf("\n  --- Patient Details ---\n");
-                printf("\tName: %s\n", hashTable[index]->name);
-                printf("\tAge: %d\n", hashTable[index]->age);
-                printDosage(index);
+                printPatientData(name);
                 break;
             case(2):
-                if (removePatient(hashTable[index]->name) == 0){
+                if (removePatient(name) == 0){
                     printf("Remove patient success\n");
                     return;
                 }
@@ -75,15 +73,17 @@ void handlePatientSelection(int index) {
 
 void handleAddDosage(){
     int dose;
-    int day; int month; int year;
+    int day; 
+    int month; 
+    int year;
     printf("How large of a dose would you like to add (in mg)?\n");
-    scanf("%d\n", dose);
+    scanf("%d\n", &dose);
     printf("Please fill in today's date (dd/mm/yyyy).\nType in the date and press enter.\n");
-    scanf("%d",day);
+    scanf("%d",&day);
     printf("/");
-    scanf("%d",month);
+    scanf("%d",&month);
     printf("/");
-    scanf("%d",year);
+    scanf("%d",&year);
     printf("/");
 }
 

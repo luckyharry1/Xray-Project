@@ -45,8 +45,24 @@ bool disconnectFromCentralAcquisition()
 
 void selectExaminationType(const EXAMINATION_TYPES examination) 
 {
-	(void) examination; // remove this line as soon as you are doing something with the argument
-	return;
+	switch (examination)
+	{
+	case EXAM_TYPE_SINGLE_SHOT:
+		writeMsgToSerialPort("EXAM1");
+		break;
+	case EXAM_TYPE_SERIES:
+		writeMsgToSerialPort("EXAM2");
+		break;
+	case EXAM_TYPE_SERIES_WITH_MOTION:
+		writeMsgToSerialPort("EXAM3");
+		break;
+	case EXAM_TYPE_FLUORO:
+		writeMsgToSerialPort("EXAM4");
+		break;
+	case EXAM_TYPE_NONE:
+		writeMsgToSerialPort("EXAM0");
+		break;
+	}
 }
 
 bool getDoseDataFromCentralAcquisition(uint32_t * doseData)
