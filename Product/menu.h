@@ -12,9 +12,7 @@ typedef enum {
     MO_QUIT
 } MenuOptions;
 
-void printDosage(int index);
-
-void handlePatientSelection(int index);
+void handlePatientSelection(char *name);
 
 MenuOptions getMenuChoice(void);
 void displayMenu();

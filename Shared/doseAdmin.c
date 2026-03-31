@@ -7,12 +7,15 @@
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <time.h>
 
-// Global hash table definition (extern declared in doseAdmin.h)
-patient* hashTable[TABLE_SIZE]; 
+
 // Brice: use Patient
+Patient* hashTable[TABLE_SIZE]; // NULL = empty slot
 // no extern keyword => hashTable only visible in doseAdmin.c
 // implement pritn function here and call it from main.c
+int selectedPatient = -1;
+
 
 //int8_t patientDoseInPeriod(char * patientName,
 //                           date* startDate, date* endDate, uint32_t* totalDose){
@@ -36,9 +39,29 @@ int8_t readFromFile(char * filePath){
 	 return -1;
 }
 
-int8_t selectPaitent(){
-    return -1;
-}
+
+unsigned int hash(char *name);
+
+void initHashTable();
+
+void printTable();
+
+void printPatientData(char *name);
+
+void toLowercase(char *string);
+
+int8_t addPatient(char *name);
+
+int16_t isPatientPresent(char * name);
+
+void selectPatient(char *name);
+
+void managePatient();
+
+bool removePatient();
+
+int8_t addPatientDose(uint16_t dosage);
+
 
 
 unsigned int hash(char *name){ // unsigned means it can store only positive whole number, doubling the positive range
@@ -60,7 +83,6 @@ void initHashTable(){
     }
 
     addPatient("JohnDoe");
-    //empty table initialized
 }
 
 
@@ -74,8 +96,8 @@ void printTable(){ //FOR DEBUGGING
 }
 
 
-void printPatientData(char name){ // NO PRINTF's, return data from empty pointers initalized in menu.c
-    int index = isPatientPresent(name);
+void printPatientData(char *name){ // NO PRINTF's, return data from empty pointers initalized in menu.c
+    int index = selectedPatient;
 
     printf("\n  --- Patient Details ---\n");
     printf("\tName: %s\n", hashTable[index]->name);
@@ -96,21 +118,29 @@ void toLowercase(char *string){
 
 // you need to read the headerr file (return values)
 int8_t addPatient(char *name){
-    int index = isPatientPresent(name);
+    char nameLowercase[MAX_NAME];
+    strncpy(nameLowercase, name, MAX_NAME - 1);
+    nameLowercase[MAX_NAME - 1] = '\0';
+    toLowercase(nameLowercase); // copying the name for looking up, and changing it to lowercase
+    
+    int index = hash(nameLowercase);
 
     if (hashTable[index] != NULL) {
         return -2;
-        }
-
-    hashTable[index] = malloc(sizeof(patient)); // free function for freeing memory, otherwise memory will stay allocated
+    }
+    
+    hashTable[index] = malloc(sizeof(Patient)); // free function for freeing memory, otherwise memory will stay allocated
     
     if (hashTable[index] == NULL){
-        return -3; 
+        return -3; // HEAP FULL
     }
 
     strncpy(hashTable[index]->name, name, MAX_NAME - 1);
     hashTable[index]->name[MAX_NAME - 1] = '\0';
-    //addPatientDose(date, dose);
+    hashTable[index]->doseCount = 0;
+    
+    int dosage = 5; //------------------------------------------TESTING----------------------------
+    addPatientDose(dosage); // TEMP 5 dosage amt
     return 0;
 }
 
@@ -144,51 +174,72 @@ int16_t isPatientPresent(char * name){
 }
 
 
-
-int8_t managePatient(char *name){
+void selectPatient(char* name){
     int index = isPatientPresent(name);
-    if (index == -1){
+    if(index == -1){
+        name[0] = "\0";
         return;
     }
 
-    handlePatientSelection(hashTable[index]->name);
+    selectedPatient = index;
+    strncpy(hashTable[index]->name, name, MAX_NAME - 1); 
+
+    return;
 }
 
 
 
-bool removePatient(char *name){
-    int index = isPatientPresent(name);
+void managePatient(){
+    int index = selectedPatient;
 
-    if (index == -1){
-        return false;
-    }
+    char patientName[MAX_NAME];
+    strncpy(patientName, hashTable[index]->name, MAX_NAME); 
+    
+    handlePatientSelection(patientName);
+    return 0;
+}
+
+
+
+bool removePatient(){
+    int index = selectedPatient;
 
     if (strncmp(hashTable[index]->name, "JohnDoe", MAX_NAME) == 0){
         return false;
     }
-    hashTable[index]->name[0] = '\0';
-    hashTable[index]->doseCount = 0;
+
+    free(hashTable[index]->doseData);
+    free(hashTable[index]);
+    hashTable[index] = NULL;
     
-    for (int i=0; i<MAX_DOSE_MEASUREMENTS; i++){
+    /*for (int i=0; i<MAX_DOSE_MEASUREMENTS; i++){
         hashTable[index]->doseData[i]->dosage = 0;
         hashTable[index]->doseData[i]->date.day = 0;
         hashTable[index]->doseData[i]->date.month = 0;
         hashTable[index]->doseData[i]->date.year = 0;
-    }
-    hashTable[index] = NULL;
+    }*/
     return true;
 }
 
 
 
-int8_t addPatientDose(uint8_t index, uint8_t day, uint8_t month, uint16_t year, uint16_t dosage){
-    int d, m, y;
-    printf("What is the date? (dd/mm/yyyy)\n");
-    scanf("%d", &d); printf("/");
-    scanf("%d", &m); printf("/");
-    scanf("%d", &y); printf("\n");
-    day = d; month = m; year = y;
+int8_t addPatientDose(uint16_t dosage){
+    int index = selectedPatient;
 
     hashTable[index]->doseCount++;
+    int doseCnt = hashTable[index]->doseCount;
+    int* d = hashTable[index]->doseData[doseCnt]->date.day;
+    int* m = hashTable[index]->doseData[doseCnt]->date.month;
+    int* y = hashTable[index]->doseData[doseCnt]->date.year;
+
+    time_t t = time(NULL);
+    struct tm* ptr;
+    ptr = localtime(&t);
+
+    d = ptr->tm_mday; 
+    m = ptr->tm_mon; 
+    y = ptr->tm_year;
+
+    hashTable[index]->doseData[doseCnt]->dosage;
 	return -1;
 }

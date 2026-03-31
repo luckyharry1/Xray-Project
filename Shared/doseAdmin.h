@@ -26,18 +26,13 @@ typedef struct {
     char name[MAX_NAME];
     doseData* doseData[MAX_DOSE_MEASUREMENTS];    // dynamically allocated array of dose records
     int doseCount;
-} patient;
-
-extern patient* hashTable[TABLE_SIZE]; // NULL = empty slot
+} Patient;
 
 //unsigned int hash(char *name);
 
-/*
-* Initialize the hash table (clear all entries)
-*/
 void initHashTable();
 
-bool hashTableInsert(char *name);
+int8_t addPatient(char *name);
 
 void managePatient();
 /*
@@ -45,7 +40,7 @@ void managePatient();
 */
 void printTable();
 
-void printPatientData(index);
+void printPatientData(char *name);
 
 /**************************************************************************************
  * Changes characters to lowercase for searching
@@ -61,7 +56,7 @@ void printPatientData(index);
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-bool removePatient(char *name);
+bool removePatient();
 
 /***************************************************************************************
  * Selects the patient as the active patient (selected patient)
@@ -71,7 +66,7 @@ bool removePatient(char *name);
  * 0 if pass
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-int8_t selectPaitent();
+void selectPatient(char *name);
 
 
 /***************************************************************************************

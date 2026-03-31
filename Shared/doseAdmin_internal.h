@@ -26,7 +26,7 @@ uint8_t hashFunction(char * patientName);
  * Returns the entry to the hash table
  *
  * Returns now a void pointer, but feel free to change it to for instance a pointer to a 
- * patient struct.
+ * Patient struct.
  */
 void * getHashTable();
 

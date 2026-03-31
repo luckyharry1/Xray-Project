@@ -3,10 +3,6 @@
 #include <stdint.h>
 #include <fcntl.h>
 
-void printDosage(int index);
-
-void handlePatientSelection(int index);
-
 static int getInt();
 
 static const char* MenuStrings[] = {
@@ -46,7 +42,8 @@ static int getInt()
     return value;
 }
 
-void handlePatientSelection(name) {
+void handlePatientSelection(char *name) {
+    system("clear");
     bool validInput = false;
     while (validInput == false){
 
@@ -59,7 +56,7 @@ void handlePatientSelection(name) {
                 break;
             case(2):
                 if (removePatient(name) == 0){
-                    printf("Remove patient success\n");
+                    printf("Remove Patient success\n");
                     return;
                 }
                 break;
@@ -88,6 +85,6 @@ void handleAddDosage(){
 }
 
 void printDosage(int index){
-    // TODO: implement when dosage field is added to patient struct
+    // TODO: implement when dosage field is added to Patient struct
     (void)index;
 }
