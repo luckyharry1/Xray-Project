@@ -3,9 +3,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "../Interface_PatAdmin_CentralAcq/Protocol_PatientAdmin_CentralAcq.h"
+
 bool connectWithCentralAcquisition();
+
 bool disconnectFromCentralAcquisition();
+
 void selectExaminationType(const EXAMINATION_TYPES examination);
+
 bool getDoseDataFromCentralAcquisition(uint32_t * doseData);
 
 #endif

@@ -8,7 +8,6 @@ static int getInt();
 static const char* MenuStrings[] = {
     "View Table Data",
     "Add Patient",
-    "Manage Patient",
     "Select Patient",
     "Delete Patient",
     "Select Examination Type", 
@@ -20,8 +19,7 @@ MenuOptions getMenuChoice(void)
    return (MenuOptions) getInt();
 }
 
-void displayMenu()
-{
+void displayMenu() {
 	size_t NrMenuStrings = sizeof(MenuStrings) / sizeof(MenuStrings[0]);
 	
 	printf("\n\t------Menu-----\t\n");
@@ -29,8 +27,7 @@ void displayMenu()
 	printf("choice: ");
 }
 
-static int getInt()
-{
+static int getInt() {
     char line[MAX_NAME];
     char* result = NULL;
     int value = -1;

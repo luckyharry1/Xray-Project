@@ -66,7 +66,7 @@ bool removePatient();
  * 0 if pass
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-void selectPatient(char *name);
+int8_t selectPatient(char *name);
 
 
 /***************************************************************************************
@@ -88,7 +88,7 @@ void selectPatient(char *name);
  * Returns -1 when no patient is selected or allocation failed
  * Returns  0 when the data is successfully added
  */
-int8_t addPatientDose(uint8_t index, uint8_t day, uint8_t month, uint16_t year, uint16_t dosage);
+int8_t addPatientDose(uint16_t dosage);
 
 
 /***************************************************************************************

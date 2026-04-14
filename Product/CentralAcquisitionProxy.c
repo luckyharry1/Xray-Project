@@ -1,4 +1,5 @@
 #include "CentralAcquisitionProxy.h"
+#include "../Shared/doseAdmin.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h> // sleep
@@ -9,8 +10,7 @@ static bool connect();
 static bool writeMsgToSerialPort(const char msg[]);
 static bool getMsgFromCentralAcquisition(char msg[MAX_MSG_SIZE]);
 
-bool connectWithCentralAcquisition()
-{
+bool connectWithCentralAcquisition(){
 	bool trySucceeded = false;
 	if (setupSerialConnection()) {
 		trySucceeded = connect(); 
@@ -45,31 +45,29 @@ bool disconnectFromCentralAcquisition()
 
 void selectExaminationType(const EXAMINATION_TYPES examination) 
 {
-	switch (examination)
-	{
+	switch (examination) {
+	case EXAM_TYPE_NONE:
+		writeMsgToSerialPort("EXAM:0"); // check header file acq
+		break;
 	case EXAM_TYPE_SINGLE_SHOT:
-		writeMsgToSerialPort("EXAM1");
+		writeMsgToSerialPort("EXAM:1");
 		break;
 	case EXAM_TYPE_SERIES:
-		writeMsgToSerialPort("EXAM2");
+		writeMsgToSerialPort("EXAM:2");
 		break;
 	case EXAM_TYPE_SERIES_WITH_MOTION:
-		writeMsgToSerialPort("EXAM3");
+		writeMsgToSerialPort("EXAM:3");
 		break;
 	case EXAM_TYPE_FLUORO:
-		writeMsgToSerialPort("EXAM4");
-		break;
-	case EXAM_TYPE_NONE:
-		writeMsgToSerialPort("EXAM0");
+		writeMsgToSerialPort("EXAM:4");
 		break;
 	}
 }
 
-bool getDoseDataFromCentralAcquisition(uint32_t * doseData)
-{
+bool getDoseDataFromCentralAcquisition(uint32_t * doseData){
 	char msg[MAX_MSG_SIZE];
 	if (getMsgFromCentralAcquisition(msg)) {
-		*doseData = 666;// remove this line as soon as you are really doing something with msg
+		addPatientDose(msg);
 		return true;
 	}
 	return false;
@@ -100,8 +98,11 @@ static bool getMsgFromCentralAcquisition(char msg[MAX_MSG_SIZE])
 					msg[receiveIndex] = '\0';
 					return true;
 				}
-				else msg[receiveIndex++] = receivedChar;   // oeps, oeps. 
-				                                           // What will happen when receiveIndex equals MAX_MSG_SIZE.  FIX THIS
+				else msg[receiveIndex++] = receivedChar;    // oeps, oeps. 
+				if (receiveIndex >= MAX_MSG_SIZE){
+					printf("ERROR!! MSG LENGTH TOO LONG");
+					return false;
+				}                                           // What will happen when receiveIndex equals MAX_MSG_SIZE.  FIX THIS
 				break;
 			default:
 				break;

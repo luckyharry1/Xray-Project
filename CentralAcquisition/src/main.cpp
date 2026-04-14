@@ -4,17 +4,23 @@
 #include <stdbool.h>
 #include "../../Interface_PatAdmin_CentralAcq/Protocol_PatientAdmin_CentralAcq.h"
 
-#define LED 6
+#define GRNLED 5
+#define REDLED 6
 
 typedef enum {
 	EV_CONNECT_MSG_RECEIVED, 
 	EV_DISCONNECT_MSG_RECEIVED, 
-	EV_NONE
+	EV_IDLE,
+    EV_EXAM_SINGLE_SHOT,
+    EV_EXAM_SERIES,
+    EV_EXAM_SERIES_WITH_MOTION,
+    EV_EXAM_FLUORO,
+    EV_NO_EVENT,
 } EVENTS;
 
 typedef enum {
     STATE_DISCONNECTED,
-    STATE_CONNECTED    // probably in the future this state will have substates!!
+    STATE_CONNECTED,
 } CENTRAL_ACQ_STATES;
 
 typedef enum {
@@ -25,6 +31,11 @@ typedef enum {
 // Forward declarations
 static bool writeMsgToSerialPort(const char msg[MAX_MSG_SIZE]);
 bool checkForMsgOnSerialPort(char recieved_msg[MAX_MSG_SIZE]);
+void EXAM_IDLE();
+void EXAM_SINGLE_SHOT();
+void EXAM_SERIES();
+void EXAM_SERIES_WITH_MOTION();
+void EXAM_FLOURO();
 
 void handleEvent(EVENTS event) //Check state and handle incoming events
 {
@@ -41,9 +52,21 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
             if (event == EV_DISCONNECT_MSG_RECEIVED) {
                 centralAcqState = STATE_DISCONNECTED;
                 writeMsgToSerialPort(DISCONNECT_MSG);
+            } else if (event == EV_IDLE){
+                EXAM_IDLE();
+            } 
+            else if (event == EV_EXAM_SINGLE_SHOT) {
+                EXAM_SINGLE_SHOT();
+            } 
+            else if (event == EV_EXAM_SERIES) {
+                EXAM_SERIES();
             }
-            break;
-        default:
+            else if (event == EV_EXAM_SERIES_WITH_MOTION) {
+                EXAM_SERIES_WITH_MOTION();
+            }
+            else if (event == EV_EXAM_FLUORO) {
+                EXAM_FLOURO();
+            }
             break;
     }
 }
@@ -58,11 +81,23 @@ EVENTS getEvent() //Only checks whether a connect/disconnect message is recieved
         else if (strcmp(msg, DISCONNECT_MSG) == 0){
             return EV_DISCONNECT_MSG_RECEIVED;
         }
-        else if (msg == "EXAM1"){
-            analogWrite(LED, 255);
+        else if (strncmp(msg, "EXAM", 4) == 0){
+            switch (msg[5])
+            {
+            case '0': //IDLE
+                return EV_IDLE;
+            case '1': //SINGLE SHOT
+                return EV_EXAM_SINGLE_SHOT;
+            case '2':
+                return EV_EXAM_SERIES;
+            case '3':
+                return EV_EXAM_SERIES_WITH_MOTION;
+            case '4':
+                return EV_EXAM_FLUORO;
+            }
         }
     }
-    return EV_NONE;
+    return EV_IDLE;
 }
 
 
@@ -115,7 +150,10 @@ bool checkForMsgOnSerialPort(char recieved_msg[MAX_MSG_SIZE])
 
 void setup() {
   Serial.begin(9600);
-  pinMode(LED, OUTPUT);
+  pinMode(REDLED, OUTPUT);
+  pinMode(GRNLED, OUTPUT);
+
+  
 }
 
 void loop() {
@@ -127,8 +165,31 @@ void loop() {
     static int doseCnt = 0;
     unsigned long curTime = millis();
     if (curTime > timeOut) {
-        Serial.print("$dose:"); Serial.print(doseCnt); Serial.println("#");
+        Serial.print("$DOSE:"); Serial.print(doseCnt); Serial.println("#");
         timeOut = curTime + 5000;
         doseCnt++;
     }
+}
+
+void EXAM_IDLE(){
+    analogWrite(GRNLED, 255);
+    analogWrite(REDLED, 0);
+}
+
+void EXAM_SINGLE_SHOT(){
+    analogWrite(GRNLED, 0);
+    analogWrite(REDLED, 255);
+    delay(5000);
+}
+
+void EXAM_SERIES(){
+
+}
+
+void EXAM_SERIES_WITH_MOTION(){
+
+}
+
+void EXAM_FLOURO(){
+
 }

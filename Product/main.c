@@ -10,7 +10,7 @@ typedef enum {
 	CONNECTED_WITH_CENTRAL_ACQUISITION
 } CENTRAL_ACQUISITION_CONNECTION_STATE;
 
-char selectedPatientName[MAX_NAME];
+char selectedPatientName[MAX_NAME] = "johndoe";
 
 /*---------------------------------------------------------------*/
 int main(int argc, char* argv[])
@@ -65,13 +65,15 @@ int main(int argc, char* argv[])
 
 
 					int strLen = sizeof(name);
-
-					for(int i=0; i < sizeof(name); i++) // if any char == 0, cancel
+					for(int i=0; i < strLen; i++) // if any char == 0, cancel
 					{ 
+						bool status = true;
 						if ((int)name[i] == 48){
 							printf("Cancelling.");
+							status = false;
 							break;
 						}
+
 					}
 					switch (addPatient(name)) 
 					{
@@ -88,41 +90,37 @@ int main(int argc, char* argv[])
 					break;
 				}		
 				break;
-				
-
-				case MO_MANAGE_PATIENT:{
-					system("clear");
-
-					managePatient();
-					break;
 				}
+
 
 				case MO_SELECT_PATIENT:{
 					system("clear");
-					char name[MAX_NAME];
+					char nameInput[MAX_NAME];
 
 					printf("Enter name to select patient: (0 to cancel) ");
-					if (scanf("%s", name) != 1){
+					if (scanf("%s", nameInput) != 1){
 						printf("ERROR: Invalid Input.");
 						return 0;
 					}
 
-					for(int i=0; i < sizeof(name); i++){ // if any char == 0, cancel
-						if ((int)name[i] == 48){
+					for(int i=0; i < sizeof(nameInput); i++){ // if any char == 0, cancel
+						if ((int)nameInput[i] == 48){
 							printf("Cancelling.");
 							break;
 						}
 					}
 
-					int* ptr = NULL;
-					ptr = &selectedPatientName;
-
-					selectPatient(ptr);
-					if(selectedPatientName[0] == "\0") //-------------- add more error codes -------------
-					{   
-						printf("ERROR, PERSON NOT FOUND");
+					int8_t selectResult = selectPatient(nameInput);
+					if(selectResult == -2){
+						printf("ERROR: Patient '%s' not found.\n", nameInput);
+						break;
+					} else if(selectResult == -1){
+						printf("ERROR: Hash collision — a different patient occupies this slot.\n");
+						break;
 					}
+					strncpy(selectedPatientName, nameInput, MAX_NAME);
 
+					managePatient();
 					break;
 				}
 
@@ -130,11 +128,11 @@ int main(int argc, char* argv[])
 					system("clear");
 
 					char input;
-					printf("Are you sure you would like to remove ""%s""?\n Y/n\n", selectedPatientName);
-					if (scanf("%s", &input) != 1) {
+					printf("Are you sure you would like to remove ""%s""?\nY/n\n", selectedPatientName);
+					if (scanf(" %c", &input) != 1) {
 						printf("ERROR: Invalid Input.");
 						break;
-					} else if(input != "Y" || input != "y") {
+					} else if(input != 'Y' && input != 'y') {
 						break;
 					}
 					
@@ -175,7 +173,7 @@ int main(int argc, char* argv[])
 				}
 			}
 			displayMenu();
-		}
-    }
-	return;
+    	}
+	}
+	return 0;
 }

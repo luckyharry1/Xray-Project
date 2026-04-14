@@ -14,7 +14,7 @@
 Patient* hashTable[TABLE_SIZE]; // NULL = empty slot
 // no extern keyword => hashTable only visible in doseAdmin.c
 // implement pritn function here and call it from main.c
-int selectedPatient = -1;
+int selectedPatient = 254;
 
 
 //int8_t patientDoseInPeriod(char * patientName,
@@ -54,7 +54,7 @@ int8_t addPatient(char *name);
 
 int16_t isPatientPresent(char * name);
 
-void selectPatient(char *name);
+int8_t selectPatient(char *name);
 
 void managePatient();
 
@@ -101,7 +101,7 @@ void printPatientData(char *name){ // NO PRINTF's, return data from empty pointe
 
     printf("\n  --- Patient Details ---\n");
     printf("\tName: %s\n", hashTable[index]->name);
-    printDosage(index);
+    //printDosage(index);
     return;
 }
 
@@ -116,7 +116,7 @@ void toLowercase(char *string){
 }
 
 
-// you need to read the headerr file (return values)
+// you need to read the header file (return values)
 int8_t addPatient(char *name){
     char nameLowercase[MAX_NAME];
     strncpy(nameLowercase, name, MAX_NAME - 1);
@@ -130,7 +130,10 @@ int8_t addPatient(char *name){
     }
     
     hashTable[index] = malloc(sizeof(Patient)); // free function for freeing memory, otherwise memory will stay allocated
-    
+    for(int i=0; i<MAX_DOSE_MEASUREMENTS; i++){
+        hashTable[index]->doseData[i] = malloc(sizeof(doseData));
+    }
+
     if (hashTable[index] == NULL){
         return -3; // HEAP FULL
     }
@@ -139,8 +142,6 @@ int8_t addPatient(char *name){
     hashTable[index]->name[MAX_NAME - 1] = '\0';
     hashTable[index]->doseCount = 0;
     
-    int dosage = 5; //------------------------------------------TESTING----------------------------
-    addPatientDose(dosage); // TEMP 5 dosage amt
     return 0;
 }
 
@@ -163,28 +164,29 @@ int16_t isPatientPresent(char * name){
         if (strncmp(storedNameLowercase, nameLowercase, MAX_NAME) == 0){
             return index;
         } else {
-            printf("ERROR: PATIENT ALREADY ADDED\n");
+            //printf("ERROR: PATIENT ALREADY ADDED\n");
             return -1;
         }
     } else {
-        printf("ERROR, SPACE IS TAKEN\n");
-        return -1;
+        //printf("ERROR, SPACE IS TAKEN\n");
+        return -2;
     }
 
 }
 
 
-void selectPatient(char* name){
+int8_t selectPatient(char* name){
     int index = isPatientPresent(name);
+    if(index == -2){
+        return -2; // patient not found
+    }
     if(index == -1){
-        name[0] = "\0";
-        return;
+        return -1; // hash collision, different patient at slot
     }
 
     selectedPatient = index;
-    strncpy(hashTable[index]->name, name, MAX_NAME - 1); 
-
-    return;
+    strncpy(hashTable[index]->name, name, MAX_NAME - 1);
+    return 0;
 }
 
 
@@ -196,7 +198,7 @@ void managePatient(){
     strncpy(patientName, hashTable[index]->name, MAX_NAME); 
     
     handlePatientSelection(patientName);
-    return 0;
+    return;
 }
 
 
@@ -208,7 +210,6 @@ bool removePatient(){
         return false;
     }
 
-    free(hashTable[index]->doseData);
     free(hashTable[index]);
     hashTable[index] = NULL;
     
@@ -225,21 +226,19 @@ bool removePatient(){
 
 int8_t addPatientDose(uint16_t dosage){
     int index = selectedPatient;
+    
+    time_t t = time(NULL);
+    struct tm* timePtr;
+    timePtr = localtime(&t);
+
+
+    int doseCnt = hashTable[index]->doseCount;
+    hashTable[index]->doseData[doseCnt]->date.day = timePtr-> tm_mday;
+    hashTable[index]->doseData[doseCnt]->date.month = timePtr-> tm_mon;
+    hashTable[index]->doseData[doseCnt]->date.year = timePtr-> tm_year;
+
+    hashTable[index]->doseData[doseCnt]->dosage = dosage;
 
     hashTable[index]->doseCount++;
-    int doseCnt = hashTable[index]->doseCount;
-    int* d = hashTable[index]->doseData[doseCnt]->date.day;
-    int* m = hashTable[index]->doseData[doseCnt]->date.month;
-    int* y = hashTable[index]->doseData[doseCnt]->date.year;
-
-    time_t t = time(NULL);
-    struct tm* ptr;
-    ptr = localtime(&t);
-
-    d = ptr->tm_mday; 
-    m = ptr->tm_mon; 
-    y = ptr->tm_year;
-
-    hashTable[index]->doseData[doseCnt]->dosage;
-	return -1;
+	return 0;
 }
