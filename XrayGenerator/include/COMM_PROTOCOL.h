@@ -21,7 +21,7 @@ typedef enum {
 } MsgType;
 
 typedef enum {
-  ERR_UNKOWN   = 0x01
+  ERR_UNKNOWN   = 0x01
 } ErrorCode;
 
 #endif COMM_PROTOCOL_H

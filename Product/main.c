@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
 						break;
 					}
 					
-					if (removePatient() == false) {
+					if (removePatient(input) == false) {
 						printf("ERROR: Remove Patient Failed");
 						break;
 					} else {

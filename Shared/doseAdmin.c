@@ -14,8 +14,10 @@
 Patient* hashTable[TABLE_SIZE]; // NULL = empty slot
 // no extern keyword => hashTable only visible in doseAdmin.c
 // implement pritn function here and call it from main.c
-int selectedPatient = 254;
 
+Patient* selectedPatient = NULL;
+
+Patient* johnDoePtr = NULL;
 
 //int8_t patientDoseInPeriod(char * patientName,
 //                           date* startDate, date* endDate, uint32_t* totalDose){
@@ -40,30 +42,6 @@ int8_t readFromFile(char * filePath){
 }
 
 
-unsigned int hash(char *name);
-
-void initHashTable();
-
-void printTable();
-
-void printPatientData(char *name);
-
-void toLowercase(char *string);
-
-int8_t addPatient(char *name);
-
-int16_t isPatientPresent(char * name);
-
-int8_t selectPatient(char *name);
-
-void managePatient();
-
-bool removePatient();
-
-int8_t addPatientDose(uint16_t dosage);
-
-
-
 unsigned int hash(char *name){ // unsigned means it can store only positive whole number, doubling the positive range
     int length = strlen(name); //count amount of char
     unsigned int hashValue = 0;
@@ -83,6 +61,8 @@ void initHashTable(){
     }
 
     addPatient("JohnDoe");
+    //johnDoePtr = isPatientPresent("JohnDoe");
+    //selectPatient("JohnDoe");
 }
 
 
@@ -97,32 +77,28 @@ void printTable(){ //FOR DEBUGGING
 
 
 void printPatientData(char *name){ // NO PRINTF's, return data from empty pointers initalized in menu.c
-    int index = selectedPatient;
-
     printf("\n  --- Patient Details ---\n");
-    printf("\tName: %s\n", hashTable[index]->name);
+    printf("\tName: %s\n", selectedPatient->name);
     //printDosage(index);
     return;
 }
 
 
 
-void toLowercase(char *string){
-    size_t length = strlen(string);
-    for (size_t i = 0; i < length && i< MAX_NAME -1; i++){
-        string[i] = (char)tolower((unsigned char)string[i]); // changing any character to lowercase
+void toLowercase(char *nameLowercase, const char *name){
+    size_t i;
+    for (i = 0; i < MAX_NAME - 1 && name[i] != '\0'; i++){
+        nameLowercase[i] = (char)tolower(name[i]);
     }
-    string[length] = '\0';
+    nameLowercase[i] = '\0';
 }
 
 
 // you need to read the header file (return values)
 int8_t addPatient(char *name){
     char nameLowercase[MAX_NAME];
-    strncpy(nameLowercase, name, MAX_NAME - 1);
-    nameLowercase[MAX_NAME - 1] = '\0';
-    toLowercase(nameLowercase); // copying the name for looking up, and changing it to lowercase
-    
+    toLowercase(nameLowercase, name);
+
     int index = hash(nameLowercase);
 
     if (hashTable[index] != NULL) {
@@ -130,9 +106,6 @@ int8_t addPatient(char *name){
     }
     
     hashTable[index] = malloc(sizeof(Patient)); // free function for freeing memory, otherwise memory will stay allocated
-    for(int i=0; i<MAX_DOSE_MEASUREMENTS; i++){
-        hashTable[index]->doseData[i] = malloc(sizeof(doseData));
-    }
 
     if (hashTable[index] == NULL){
         return -3; // HEAP FULL
@@ -147,31 +120,36 @@ int8_t addPatient(char *name){
 
 
 
-int16_t isPatientPresent(char * name){
-    char nameLowercase[MAX_NAME];
-    strncpy(nameLowercase, name, MAX_NAME - 1);
-    nameLowercase[MAX_NAME - 1] = '\0';
-    toLowercase(nameLowercase); // copying the name for looking up, and changing it to lowercase
+Patient* isPatientPresent(char * name){
+    char inputNameLowercase[MAX_NAME];
+    toLowercase(inputNameLowercase, name);
 
-    int index = hash(nameLowercase);
+    int index = hash(inputNameLowercase);
 
-    if (hashTable[index] != NULL && hashTable[index]->name[0] != '\0'){
-        char storedNameLowercase[MAX_NAME];
-        strncpy(storedNameLowercase, hashTable[index]->name, MAX_NAME - 1);
-        storedNameLowercase[MAX_NAME - 1] = '\0';
-        toLowercase(storedNameLowercase);
 
-        if (strncmp(storedNameLowercase, nameLowercase, MAX_NAME) == 0){
-            return index;
-        } else {
-            //printf("ERROR: PATIENT ALREADY ADDED\n");
-            return -1;
-        }
-    } else {
-        //printf("ERROR, SPACE IS TAKEN\n");
-        return -2;
+    if (hashTable[index] == NULL){
+        return NULL;
     }
 
+
+    char *storedNameLowercase[MAX_NAME];
+    toLowercase(storedNameLowercase[MAX_NAME], hashTable[index]->name);
+
+
+    if (strncmp(storedNameLowercase, inputNameLowercase, MAX_NAME) == 0){
+        return hashTable[index];
+    }
+     
+    Patient* current = hashTable[index]; 
+    while (current != NULL){
+        toLowercase(storedNameLowercase, current->name);
+        if (strncmp(storedNameLowercase, inputNameLowercase, MAX_NAME) == 0){
+            return current;
+        }
+        current = current->next;
+    }
+
+    return NULL;
 }
 
 
@@ -192,34 +170,56 @@ int8_t selectPatient(char* name){
 
 
 void managePatient(){
-    int index = selectedPatient;
-
     char patientName[MAX_NAME];
-    strncpy(patientName, hashTable[index]->name, MAX_NAME); 
-    
+    strncpy(patientName, selectedPatient->name, MAX_NAME);
+
     handlePatientSelection(patientName);
     return;
 }
 
 
 
-bool removePatient(){
-    int index = selectedPatient;
-
-    if (strncmp(hashTable[index]->name, "JohnDoe", MAX_NAME) == 0){
+bool removePatient(char name){
+    Patient *patPtr = isPatientPresent(name);
+    if(patPtr == NULL){
         return false;
     }
 
-    free(hashTable[index]);
-    hashTable[index] = NULL;
-    
-    /*for (int i=0; i<MAX_DOSE_MEASUREMENTS; i++){
-        hashTable[index]->doseData[i]->dosage = 0;
-        hashTable[index]->doseData[i]->date.day = 0;
-        hashTable[index]->doseData[i]->date.month = 0;
-        hashTable[index]->doseData[i]->date.year = 0;
-    }*/
-    return true;
+    char inputNameLowercase[MAX_NAME];
+    toLowercase(inputNameLowercase, name);
+    int index = hash(inputNameLowercase);
+
+    char tempName[MAX_NAME];
+    toLowercase(tempName, hashTable[index]->name);
+
+    if (strncmp(tempName, inputNameLowercase, MAX_NAME) == 0){ // patient is at the head of the chain
+        if (hashTable[index]->next != NULL){
+            hashTable[index] = hashTable[index]->next;
+            hashTable[index]->prev = NULL;
+        } else {
+            hashTable[index] = NULL;
+        }
+        free(patPtr);
+        return true;
+    }
+
+        Patient *current = hashTable[index]; // start at head 
+        while(current != NULL){
+            toLowercase(tempName, current->name);
+            if(strncmp(tempName, inputNameLowercase, MAX_NAME) == 0){
+                if (current->next != NULL){
+                    current->prev->next = current->next;
+                    current->next->prev = current->prev;
+                } else {
+                    current->prev->next = NULL;
+                }
+                free(current);
+                return true;
+            }
+            current = current->next;
+        }
+
+    return false;
 }
 
 
@@ -233,11 +233,11 @@ int8_t addPatientDose(uint16_t dosage){
 
 
     int doseCnt = hashTable[index]->doseCount;
-    hashTable[index]->doseData[doseCnt]->date.day = timePtr-> tm_mday;
-    hashTable[index]->doseData[doseCnt]->date.month = timePtr-> tm_mon;
-    hashTable[index]->doseData[doseCnt]->date.year = timePtr-> tm_year;
+    hashTable[index]->doseData[doseCnt].date.day = timePtr-> tm_mday;
+    hashTable[index]->doseData[doseCnt].date.month = timePtr-> tm_mon;
+    hashTable[index]->doseData[doseCnt].date.year = timePtr-> tm_year;
 
-    hashTable[index]->doseData[doseCnt]->dosage = dosage;
+    hashTable[index]->doseData[doseCnt].dosage = dosage;
 
     hashTable[index]->doseCount++;
 	return 0;

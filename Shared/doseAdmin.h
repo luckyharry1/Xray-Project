@@ -22,10 +22,12 @@ typedef struct{
     Date date;
 } doseData;
 
-typedef struct {
+typedef struct patient {
     char name[MAX_NAME];
-    doseData* doseData[MAX_DOSE_MEASUREMENTS];    // dynamically allocated array of dose records
+    doseData doseData[MAX_DOSE_MEASUREMENTS];    // dynamically allocated array of dose records
     int doseCount;
+    struct patient* next;
+    struct patient* prev;
 } Patient;
 
 //unsigned int hash(char *name);
@@ -56,7 +58,7 @@ void printPatientData(char *name);
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-bool removePatient();
+bool removePatient(char *name);
 
 /***************************************************************************************
  * Selects the patient as the active patient (selected patient)
@@ -73,11 +75,12 @@ int8_t selectPatient(char *name);
  * Checks if the passed patientName is present in the administration
  *
  * Returns -1 when the passed patientName is not present
+ * Returns -2 when
  * Returns the table index when the patientName is present
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-//int16_t isPatientPresent(char * name);
+//int8_t isPatientPresent(char * name);
 
 
 
