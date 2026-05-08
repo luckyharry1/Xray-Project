@@ -64,24 +64,17 @@ void selectExaminationType(const EXAMINATION_TYPES examination)
 	}
 }
 
-bool getDoseDataFromCentralAcquisition(uint16_t * doseData){
-    char msg[MAX_MSG_SIZE];
-    if (!getMsgFromCentralAcquisition(msg)){
-		return false;
-	}
-    
-	if (strncmp("DOSE:", msg, 5) != 0){
-		return false;
-	}
+bool getDoseDataFromCentralAcquisition(uint32_t * doseData){
+	char msg[MAX_MSG_SIZE];
+	int dose;
 
-    uint16_t dose = atoi(msg + 5);
+	if (getMsgFromCentralAcquisition(dose) != true) {
+		return false;
+	}
 	
-    if (doseData != NULL) {
-		*doseData = dose;
-    	addPatientDose(dose);
-    	return true;
+	if (doseData == NULL) {
+		return false;
 	}
-
 	return false;
 }
 
