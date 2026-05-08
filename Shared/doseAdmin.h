@@ -58,7 +58,7 @@ void printPatientData(char *name);
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-bool removePatient(char *name);
+int8_t removePatient(char *name);
 
 /***************************************************************************************
  * Selects the patient as the active patient (selected patient)
@@ -80,7 +80,7 @@ int8_t selectPatient(char *name);
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-//int8_t isPatientPresent(char * name);
+Patient* isPatientPresent(char *name);
 
 
 

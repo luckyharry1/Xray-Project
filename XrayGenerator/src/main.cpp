@@ -1,59 +1,105 @@
 #include "COMM_PROTOCOL.h"
 #include <Wire.h>
+#include <Arduino.h>
 
-#define MAX_RETRIES 3
+static uint8_t lastResponse = NAK;
+static uint8_t lastPayloadOutgoing  = 0x00;
+static uint8_t lastPayloadIncoming = 0x00;
 
-static lastPayload = 0x00;
+
+void onReceive(int numBytes);
+void onRequest();
+void handleMessage(MsgType type);
 
 void setup() {
+  cli(); //disable all interrupts
   Serial.begin(9600);
-  Wire.begin();
+  Wire.begin(I2C_ADDR_SLAVE_1);
+  Wire.onReceive(onReceive);
+  Wire.onRequest(onRequest);
 
+  DDRB = DDRB | 0x01; // Set pin 8 as output pin, 9-12 to input
+
+  sei(); //enable all interrupts
 }
-
-//void sendMessage(uint8_t slaveAddr, MsgType, msg);
 
 void loop() {
-  sendMessage(I2C_ADDR_SLAVE_1, MSG_START, 0x00);
-  delay(1000);
-  sendMessage(I2C_ADDR_SLAVE_1, MSG_DATA_READY, 0x00);
-  delay(1000);
+
 }
 
+void onReceive(int numBytes) {
+  uint8_t msgType = Wire.read();
+  uint8_t msg = Wire.read();
+  lastPayloadIncoming = msg;
 
-bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint16_t msg) {
-  for (uint8_t i = 0; i < MAX_RETRIES; i++){
-    //Serial.print("ATTEMPTING #"); Serial.println(i);
-    Serial.print("Type: "); Serial.print(msgType, HEX);
-    //Serial.print("Message: "); Serial.println(msg);
-    
-    Wire.beginTransmission(slaveAddr);
-    Wire.write((uint8_t)msgType);
-    Wire.write(msg);
-    Wire.endTransmission();
+  Serial.print("type=0x"); Serial.println(msgType, HEX);
 
-    Wire.requestFrom(slaveAddr, 2);
-    if (Wire.available() >= 2) {
-      uint8_t response = Wire.read();
-      uint8_t payload  = Wire.read();
-      if (response == ACK){
-        Serial.println("\t ACK");
-        if (payload != 0x00){
-          Serial.print("MESSAGE: 0x"); Serial.println(payload, HEX);
-        }
-        return true;
-      } else {
-        Serial.println("ACK NOT RECIEVED");
-      }
-    } else {
-      Serial.println("NO RESPONSE, DEVICE MAY BE UNAVALIABLE");
-    }
-
-    delay(50);
+  if (msg != 0x00){
+    Serial.print("Incoming=0x"); Serial.println(msg, HEX);
   }
 
-  Serial.println("Failed after retries exceeded");
-  return false;
+  switch ((MsgType) msgType) {
+    case MSG_HEARTBEAT:
+      handleMessage(MSG_HEARTBEAT);
+      lastResponse = ACK;
+      break;
+    case MSG_START:
+      handleMessage(MSG_START);
+      lastResponse = ACK;
+      break;
+    case MSG_STOP:
+      handleMessage(MSG_STOP);
+      lastResponse = ACK;
+      break;
+    case MSG_ERROR:
+    //FUTURE PROOFING
+      break;
+    case MSG_DATA_READY:
+      handleMessage(MSG_DATA_READY);
+      lastResponse = ACK;
+      break;
+    default:
+      lastResponse = NAK;
+      break;
+  }
 }
 
+void onRequest() {
+  Wire.write(lastResponse);
+  Wire.write(lastPayloadOutgoing);
+  Serial.print("Response=0x"); Serial.print(lastResponse, HEX);
+  Serial.print(" Payload=0x"); Serial.println(lastPayloadOutgoing, HEX);
+  lastResponse = NAK;
+  
+}
 
+void handleMessage(MsgType type){
+  switch (type) {
+    case MSG_START:
+      switch(lastPayloadIncoming) {
+        case EXAM_TYPE_NONE:
+          PORTB = PORTB & ~0x01;
+        break;
+        case EXAM_TYPE_SINGLE_SHOT:
+          PORTB = PORTB | 0x01;
+        break;
+        case EXAM_TYPE_SERIES:
+        break;
+        case EXAM_TYPE_SERIES_WITH_MOTION:
+        break;
+        case EXAM_TYPE_FLUORO:
+        break;
+      }
+      break;
+    case MSG_STOP:
+      lastPayloadOutgoing = 0x00; //RESETS THE RESPONSE, DATA CAN BE READ ONLY ONCE UNTIL RE-REQUEST
+      break;
+    case MSG_HEARTBEAT:
+    case MSG_DATA_READY:
+      lastPayloadOutgoing = 0x01; //HARDCODED FOR NOW, THIS WOULD BE SENSOR DATA
+      break;
+    case MSG_ERROR:
+    default:
+      break;
+  }
+}
