@@ -62,7 +62,9 @@ int main(int argc, char* argv[])
 						printf("ERROR: Invalid Input.");
 						break;
 					}
-
+					if (name[0] == 0){
+						break;
+					}
 
 					int strLen = sizeof(name);
 					for(int i=0; i < strLen; i++) // if any char == 0, cancel
@@ -101,6 +103,9 @@ int main(int argc, char* argv[])
 					if (scanf("%s", nameInput) != 1){
 						printf("ERROR: Invalid Input.");
 						return 0;
+					}
+					if(nameInput[0] == 0){
+						break;
 					}
 
 					for(int i=0; i < sizeof(nameInput); i++){ // if any char == 0, cancel
