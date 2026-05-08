@@ -147,13 +147,39 @@ int main(int argc, char* argv[])
 				
 				case MO_SELECT_EXAMINATION_TYPE:{
 					system("clear");
-					if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {	
-						//void selectExaminationType(const EXAMINATION_TYPES examination);
+					if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
 						uint32_t doseData;
-						if (getDoseDataFromCentralAcquisition(&doseData)) {
-							printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
+						uint8_t examType;
+						
+						printf("Exam Type Menu\n[0]\tNO EXAM TYPE\n[1]\tSINGLE SHOT EXAM\n[2]\tSERIES EXAM\n[3]\tSERIES WITH MOTION\n[4]\tFLOURO EXAM\n");
+						printf("Enter Exam Type (0-4) ");					
+						if (scanf("%i", &examType) != 1){
+							printf("ERROR: Invalid Input.");
+							break;
 						}
-						selectExaminationType(EXAM_TYPE_SINGLE_SHOT);
+						
+						switch(examType){
+							case EXAM_TYPE_NONE: 
+								selectExaminationType(EXAM_TYPE_NONE);
+								break;
+							case EXAM_TYPE_SINGLE_SHOT: 
+								selectExaminationType(EXAM_TYPE_SINGLE_SHOT);
+								break;
+							case EXAM_TYPE_SERIES:
+								selectExaminationType(EXAM_TYPE_SERIES);
+								break;
+							case EXAM_TYPE_SERIES_WITH_MOTION:
+								selectExaminationType(EXAM_TYPE_SERIES_WITH_MOTION);
+								break;
+							case EXAM_TYPE_FLUORO:
+								selectExaminationType(EXAM_TYPE_FLUORO);
+								break;
+						}
+
+						//if (getDoseDataFromCentralAcquisition(&doseData)) {
+						//	printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
+						//}
+
 					}
 					else {
 						printf("This option is only valid when connected with CentralAcquisition\n");

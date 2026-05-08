@@ -21,16 +21,8 @@ typedef enum {
 } MsgType;
 
 typedef enum {
-	EXAM_TYPE_NONE               = 0x00,
-	EXAM_TYPE_SINGLE_SHOT        = 0x01,
-	EXAM_TYPE_SERIES             = 0x02,
-	EXAM_TYPE_SERIES_WITH_MOTION = 0x03,
-	EXAM_TYPE_FLUORO             = 0x04,
-} ExamType;
-
-typedef enum {
   ERR_UNKOWN    = 0x01,
   ERR_NOT_READY = 0x02,
 } ErrorCode;
 
-#endif COMM_PROTOCOL_H
+#endif // COMM_PROTOCOL_H

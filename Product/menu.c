@@ -49,7 +49,7 @@ void handlePatientSelection(char *name) {
         scanf("%i", &nameFunctionInput);
         switch(nameFunctionInput){
             case(1):
-                printPatientData(name);
+                //printPatientData(name);
                 break;
             case(2):
                 if (removePatient(name) == 0){

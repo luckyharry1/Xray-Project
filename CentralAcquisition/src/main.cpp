@@ -1,8 +1,12 @@
 #include <Arduino.h>
+#include <Wire.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
 #include "../../Interface_PatAdmin_CentralAcq/Protocol_PatientAdmin_CentralAcq.h"
+#include "COMM_PROTOCOL.h"
+
+#define MAX_RETRIES 3
 
 #define GRNLED 5
 #define REDLED 6
@@ -36,6 +40,7 @@ void EXAM_SINGLE_SHOT();
 void EXAM_SERIES();
 void EXAM_SERIES_WITH_MOTION();
 void EXAM_FLOURO();
+bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg);
 
 void handleEvent(EVENTS event) //Check state and handle incoming events
 {
@@ -100,7 +105,6 @@ EVENTS getEvent() //Only checks whether a connect/disconnect message is recieved
     return EV_IDLE;
 }
 
-
 static bool writeMsgToSerialPort(const char msg[MAX_MSG_SIZE]) //Write a string array to the serial port
 {
 	Serial.write(MSG_START_SYMBOL);
@@ -149,11 +153,12 @@ bool checkForMsgOnSerialPort(char recieved_msg[MAX_MSG_SIZE])
 }
 
 void setup() {
-  Serial.begin(9600);
-  pinMode(REDLED, OUTPUT);
-  pinMode(GRNLED, OUTPUT);
+    Serial.begin(9600);
+    Wire.begin();
 
-  
+    pinMode(REDLED, OUTPUT);
+    pinMode(GRNLED, OUTPUT);
+
 }
 
 void loop() {
@@ -172,6 +177,10 @@ void loop() {
 }
 
 void EXAM_IDLE(){
+    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_NONE) != true){
+        return;
+    }
+    //sendMessage(I2C_ADDR_SLAVE_2, MSG_START, EXAM_TYPE_NONE);
     analogWrite(GRNLED, 255);
     analogWrite(REDLED, 0);
 }
@@ -179,17 +188,95 @@ void EXAM_IDLE(){
 void EXAM_SINGLE_SHOT(){
     analogWrite(GRNLED, 0);
     analogWrite(REDLED, 255);
+    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_SINGLE_SHOT) != true){
+        return;
+    }
+
+    analogWrite(GRNLED, 0);
+    analogWrite(REDLED, 255);
     delay(5000);
 }
 
 void EXAM_SERIES(){
+    analogWrite(GRNLED, 0);
+    analogWrite(REDLED, 255);
+    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_SERIES) != true){
+        return;
+    }
 
+    analogWrite(GRNLED, 0);
+    analogWrite(REDLED, 255);
 }
 
 void EXAM_SERIES_WITH_MOTION(){
+    analogWrite(GRNLED, 0);
+    analogWrite(REDLED, 255);
+    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_SERIES_WITH_MOTION) != true){
+        return;
+    }
 
+    analogWrite(GRNLED, 0);
+    analogWrite(REDLED, 255);
 }
 
 void EXAM_FLOURO(){
+    analogWrite(GRNLED, 0);
+    analogWrite(REDLED, 255);
+    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_FLUORO) != true){
+        return;
+    }
 
+    analogWrite(GRNLED, 0);
+    analogWrite(REDLED, 255);
+}
+
+bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg) {
+    for (uint8_t i = 0; i < MAX_RETRIES; i++){
+    //Serial.print("ATTEMPTING #"); Serial.println(i);
+        Serial.print("Type: "); Serial.print(msgType, HEX);
+        //Serial.print("Message: "); Serial.println(msg);
+        
+        Wire.beginTransmission(slaveAddr);
+        Wire.write((uint8_t)msgType);
+        Wire.write(msg);
+        Wire.endTransmission();
+
+        delay(100);
+
+        bool recieveStatus = false;
+        while(recieveStatus == false){
+
+            Wire.requestFrom((uint8_t)slaveAddr, (uint8_t)2);
+
+            if (Wire.available() >= 2) {
+                uint8_t response = Wire.read();
+                uint8_t payload  = Wire.read();
+                if (response == ACK){
+                    Serial.println("\tACK");
+                    recieveStatus = true;
+
+                    if (payload != 0x00){
+                        Serial.print("MESSAGE: 0x"); Serial.println(payload, HEX);
+                    }
+                    return true;
+                } else if (response == NAK){
+                    Serial.println("NAK, slave not ready yet");
+                    recieveStatus = false;
+                } else {
+                    Serial.println("UNKNOWN RESPONSE");
+                    recieveStatus = false;
+                }
+
+            Serial.println("ACK NOT RECIEVED");
+            
+            } else {
+                Serial.println("NO RESPONSE, DEVICE MAY BE UNAVALIABLE");
+            }
+
+            delay(100);
+        }
+    }
+
+    Serial.println("Failed after retries exceeded");
+    return false;
 }
