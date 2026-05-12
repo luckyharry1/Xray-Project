@@ -9,7 +9,7 @@
 
 void setUp(void)
 {
-    // This is run before EACH test
+    initPatientDoseAdmin();
 }
 
 void tearDown(void)
@@ -47,6 +47,35 @@ int main()
     MY_RUN_TEST(test_FailTest);
     MY_RUN_TEST(test_LeakTest);
     MY_RUN_TEST(test_OutOfRangeTest);
+    
+    MY_RUN_TEST(testRemovePatient_WhenTableEntryIsEmpty_ThenRetrunMinus1);
+    MY_RUN_TEST(testRemovePatient_WhenTableEntryIsPatientToBeRemoved_ThenRetrun0AndPatientIsRemoved);
+    MY_RUN_TEST(testRemovePatient_WhenPatientToBeRemovedIsAtTail_ThenRetrun0AndPatientIsRemoved);
+    MY_RUN_TEST(testRemovePatient_WhenPatientToBeRemovedIsInMiddle_ThenRetrun0AndPatientIsRemoved);
 
     UnityEnd();
+}
+
+
+void testRemovePatient_WhenTableEntryIsEmpty_ThenRetrunMinus1(void)
+{
+    
+    TEST_ASSER_EQUAL(-1, removePatient("aaaaa"));
+}
+void testRemovePatient_WhenTableEntryIsPatientToBeRemoved_ThenRetrun0AndPatientIsRemoved(void)
+{
+    
+    addPatient("aaaaa");
+    
+    TEST_ASSERT_EQUAL(0, removePatient("aaaaa"));
+    TEST_ASSERT_EQUAL(-1, isPatientPresent("aaaaa"));
+}
+
+testRemovePatient_WhenPatientToBeRemovedIsAtTail_ThenRetrun0AndPatientIsRemoved(void)
+{
+    
+}
+testRemovePatient_WhenPatientToBeRemovedIsInMiddle_ThenRetrun0AndPatientIsRemoved(void)
+{
+    
 }

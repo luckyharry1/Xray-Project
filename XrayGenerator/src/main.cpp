@@ -2,6 +2,11 @@
 #include <Wire.h>
 #include <Arduino.h>
 
+#define SAN_PIN 2
+#define SINGLE_SHOT_COUNT 3
+#define SERIES_MOTION_SHOT_COUNT 10
+#define FLOURO_SHOT_COUNT 4
+
 static uint8_t lastResponse = NAK;
 static uint8_t lastPayloadOutgoing  = 0x00;
 static uint8_t lastPayloadIncoming = 0x00;
@@ -24,7 +29,7 @@ void setup() {
 }
 
 void loop() {
-
+ // ADD BOOL IF DATA READY SAN = LOW
 }
 
 void onReceive(int numBytes) {
@@ -80,14 +85,70 @@ void handleMessage(MsgType type){
         case EXAM_TYPE_NONE:
           PORTB = PORTB & ~0x01;
         break;
-        case EXAM_TYPE_SINGLE_SHOT:
-          PORTB = PORTB | 0x01;
+
+        case EXAM_TYPE_SINGLE_SHOT: //ADD TIMER FOR TIMEOUT
+          pinMode(SAN_PIN, INPUT);
+            int shotCount = 0;
+
+            while(shotCount < SINGLE_SHOT_COUNT){
+              if (digitalRead(SAN_PIN)==LOW){
+                PORTB = PORTB | 0x01;
+                delay(10);
+                PORTB = PORTB & ~0x01;
+                shotCount++;
+              }
+            }
+            pinMode(SAN_PIN,OUTPUT);
+
         break;
+
         case EXAM_TYPE_SERIES:
+          pinMode(SAN_PIN, INPUT);
+
+          while(digitalRead(SAN_PIN) == HIGH){
+            //ADD TIMEOUT
+          }
+          while(digitalRead(SAN_PIN) == LOW){
+            PORTB = PORTB ^ 0x01;
+            delay(10);
+            PORTB = PORTB ^ 0x01;
+            delay(490);
+          }
+          pinMode(SAN_PIN,OUTPUT);
         break;
+
         case EXAM_TYPE_SERIES_WITH_MOTION:
+          pinMode(SAN_PIN, INPUT);
+          int shotCount = 0;
+
+          while(shotCount < SERIES_MOTION_SHOT_COUNT || lastResponse == NAK){ // ADD TIMER FOR TIMEOUT
+            if (digitalRead(SAN_PIN) == LOW){
+              PORTB = PORTB ^ 0x01;
+              delay(10);
+              PORTB = PORTB ^ 0x01;
+              delay(490);
+              shotCount++;
+            }
+          }
+          pinMode(SAN_PIN,OUTPUT);
         break;
+
         case EXAM_TYPE_FLUORO:
+          int shotCount = 0;
+          pinMode(SAN_PIN, INPUT);
+
+          while(digitalRead(SAN_PIN) == HIGH){
+            //ADD TIMEOUT
+          }
+          while(shotCount < FLOURO_SHOT_COUNT || digitalRead(SAN_PIN) == LOW){ // ADD TIMEOUT
+            PORTB = PORTB ^ 0x01;
+            delay(10);
+            PORTB = PORTB ^ 0x01;
+            delay(240);
+            shotCount++;
+          }
+          pinMode(SAN_PIN,OUTPUT);
+          
         break;
       }
       break;

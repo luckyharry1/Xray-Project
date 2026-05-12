@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <stdbool.h>
 
 static int getInt();
 
@@ -45,43 +46,16 @@ void handlePatientSelection(char *name) {
     while (validInput == false){
 
         int nameFunctionInput;
-        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Remove User\n3. Exit\n", name);
+        printf("Selected Patient: %s\nChoose Name Function:\n1. View Patient Details\n2. Exit\n", name);
         scanf("%i", &nameFunctionInput);
         switch(nameFunctionInput){
             case(1):
                 //printPatientData(name);
                 break;
             case(2):
-                if (removePatient(name) == 0){
-                    printf("Remove Patient success\n");
-                    return;
-                }
-                break;
-            case(3):
                 return;
         }
 
     }
 
-}
-
-void handleAddDosage(){
-    int dose;
-    int day; 
-    int month; 
-    int year;
-    printf("How large of a dose would you like to add (in mg)?\n");
-    scanf("%d\n", &dose);
-    printf("Please fill in today's date (dd/mm/yyyy).\nType in the date and press enter.\n");
-    scanf("%d",&day);
-    printf("/");
-    scanf("%d",&month);
-    printf("/");
-    scanf("%d",&year);
-    printf("/");
-}
-
-void printDosage(int index){
-    // TODO: implement when dosage field is added to Patient struct
-    (void)index;
 }

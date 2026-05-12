@@ -131,21 +131,19 @@ int main(int argc, char* argv[])
 
 				case MO_DELETE_PATIENT:{
 					system("clear");
+					printf("Enter the name of the patient you would like to remove:\n");
 
-					char input;
-					printf("Are you sure you would like to remove ""%s""?\nY/n\n", selectedPatientName);
-					if (scanf(" %c", &input) != 1) {
+					char name[MAX_NAME];
+					if (scanf("%s", &name) != 1){
 						printf("ERROR: Invalid Input.");
-						break;
-					} else if(input != 'Y' && input != 'y') {
-						break;
+					break;
 					}
 					
-					if (removePatient(input) == false) {
+					if (removePatient(name) != 0) {
 						printf("ERROR: Remove Patient Failed");
 						break;
 					} else {
-						printf("Removing Patient (%s) Success", selectedPatientName);
+						printf("Removing Patient (%s) Success", name);
 					}
 					break;
 				}

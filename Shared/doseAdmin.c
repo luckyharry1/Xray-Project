@@ -44,8 +44,11 @@ int8_t readFromFile(char * filePath){
 
 unsigned int hash(char *name){ // unsigned means it can store only positive whole number, doubling the positive range
     int length = strlen(name); //count amount of char
+    if (length < 3){
+        return 0;
+    }
     unsigned int hashValue = 0;
-    for (int i=0; i < length; i++){ 
+    for (int i=0; i < 3; i++){ 
         hashValue += name[i];
         hashValue = hashValue * name[i]; // brice: check the behavior with getHashPerformance (sprint4)
     }
@@ -53,8 +56,7 @@ unsigned int hash(char *name){ // unsigned means it can store only positive whol
     return hashValue % TABLE_SIZE;
 }
 
-void initHashTable(){
-
+void initPatientDoseAdmin(){
     for (int i = 0; i < TABLE_SIZE; i++) {
         hashTable[i] = NULL; // Empty string
         //hashTable[i].name[0]='\0';
@@ -110,16 +112,13 @@ int8_t addPatient(char *name){
         return -3; // HEAP FULL
     }
     
-    strncpy(tempPat->name, name, MAX_NAME - 1);
-    tempPat->name[MAX_NAME - 1] = '\0';
+    strncpy(tempPat->name, nameLowercase, MAX_NAME - 1);
     tempPat->doseCount = 0;
-    tempPat->prev = NULL;
 
     if (hashTable[index] == NULL) {
         hashTable[index] = tempPat;
         hashTable[index]->next = NULL;
     } else {
-        hashTable[index]->prev = tempPat;
         tempPat->next = hashTable[index];
         hashTable[index] = tempPat;
     }
@@ -132,7 +131,6 @@ int8_t addPatient(char *name){
 }
 
 
-
 Patient* isPatientPresent(char * name){
     char inputNameLowercase[MAX_NAME];
     toLowercase(inputNameLowercase, name);
@@ -143,11 +141,9 @@ Patient* isPatientPresent(char * name){
         return NULL;
     }
 
-    char storedNameLowercase[MAX_NAME];
     Patient* current = hashTable[index];
     while (current != NULL){
-        toLowercase(storedNameLowercase, current->name);
-        if (strncmp(storedNameLowercase, inputNameLowercase, MAX_NAME) == 0){
+        if (strncmp(current->name, inputNameLowercase, MAX_NAME) == 0){
             return current;
         }
         current = current->next;
@@ -179,8 +175,9 @@ void managePatient(){
 
 
 int8_t removePatient(char *name){
-    Patient *patPtr = isPatientPresent(name);
-    if(patPtr == NULL){
+
+    Patient *ptr = isPatientPresent(name);
+    if(ptr == NULL){
         return -1;
     }
 
@@ -188,34 +185,33 @@ int8_t removePatient(char *name){
     toLowercase(inputNameLowercase, name);
     int index = hash(inputNameLowercase);
 
-    char storedNameLowercase[MAX_NAME];
-    toLowercase(storedNameLowercase, hashTable[index]->name);
+    if (strncmp("johndoe", inputNameLowercase, MAX_NAME) == 0){
+        return -1;
+    }
 
-    if (strncmp(storedNameLowercase, inputNameLowercase, MAX_NAME) == 0){ // if patient is at the head of the chain
+    if (strncmp(ptr->name, inputNameLowercase, MAX_NAME) == 0){ // if patient is at the head of the chain
         if (hashTable[index]->next != NULL){
             hashTable[index] = hashTable[index]->next;
-            hashTable[index]->prev = NULL;
         } else {
             hashTable[index] = NULL;
         }
-        free(patPtr);
+        free(ptr);
         return 0;
     }
 
     Patient *current = hashTable[index]; // start at head 
+    Patient* prev = NULL;
     while(current != NULL){
-        toLowercase(storedNameLowercase, current->name);
-        if(strncmp(storedNameLowercase, inputNameLowercase, MAX_NAME) == 0){
+        if(strncmp(current->name, inputNameLowercase, MAX_NAME) == 0){
             if (current->next != NULL){
-                current->prev->next = current->next;
-                current->next->prev = current->prev;
-            } else {
-                current->prev->next = NULL;
+                prev->next = current->next;
             }
             free(current);
             return 0;
         }
+        prev = current;
         current = current->next;
+        
     }
 
     return -1;
