@@ -185,7 +185,7 @@ void EXAM_IDLE(){
     analogWrite(REDLED, 0);
 }
 
-void EXAM_SINGLE_SHOT(){
+void EXAM_SINGLE_SHOT(){ // ADD XRAY BUTTON, WHEN PRESS DRIVE SAN LOW.
     analogWrite(GRNLED, 0);
     analogWrite(REDLED, 255);
     if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_SINGLE_SHOT) != true){

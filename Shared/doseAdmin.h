@@ -1,11 +1,8 @@
 #ifndef DOSEADMIN_H
 #define DOSEADMIN_H
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdbool.h>
 #include <ctype.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #define MAX_NAME	80
 #define TABLE_SIZE  256
@@ -17,22 +14,7 @@ typedef struct {
 	uint16_t year;  // value in range [1900, 2500]
 } Date;
 
-typedef struct{
-    uint16_t dosage; //dose in mg
-    Date date;
-} doseData;
-
-typedef struct patient {
-    char name[MAX_NAME];
-    doseData doseData[MAX_DOSE_MEASUREMENTS];    // dynamically allocated array of dose records
-    int doseCount;
-    struct patient* next;
-    struct patient* prev;
-} Patient;
-
-//unsigned int hash(char *name);
-
-void initHashTable();
+void initPatientDoseAdmin();
 
 int8_t addPatient(char *name);
 
@@ -44,33 +26,6 @@ void printTable();
 
 void printPatientData(char *name);
 
-/**************************************************************************************
- * Changes characters to lowercase for searching
- * ************************************************************************************
- */
-//void toLowercase(char *string);
-
-/***************************************************************************************
- * Removes the patient from the administration
- *
- * Returns -1 when the passed patientName is not present
- * Returns  0 when the patient data is successfully removed from the administration
- *
- * It is a precondition that patientName is not NULL and is \0 terminated
- */
-int8_t removePatient(char *name);
-
-/***************************************************************************************
- * Selects the patient as the active patient (selected patient)
- *
- * -1 not present
- * -2 when strlen is too much
- * 0 if pass
- * It is a precondition that patientName is not NULL and is \0 terminated
- */
-int8_t selectPatient(char *name);
-
-
 /***************************************************************************************
  * Checks if the passed patientName is present in the administration
  *
@@ -81,7 +36,6 @@ int8_t selectPatient(char *name);
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
 Patient* isPatientPresent(char *name);
-
 
 
 /***************************************************************************************
