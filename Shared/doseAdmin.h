@@ -35,7 +35,7 @@ void printPatientData(char *name);
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-Patient* isPatientPresent(char *name);
+//Patient* isPatientPresent(char *name);
 
 
 /***************************************************************************************

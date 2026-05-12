@@ -64,11 +64,11 @@ void selectExaminationType(const EXAMINATION_TYPES examination)
 	}
 }
 
-bool getDoseDataFromCentralAcquisition(uint32_t * doseData){
+bool getDoseDataFromCentralAcquisition(uint16_t * doseData){
 	char msg[MAX_MSG_SIZE];
 	int dose;
 
-	if (getMsgFromCentralAcquisition(dose) != true) {
+	if (getMsgFromCentralAcquisition(dose) != 0) {
 		return false;
 	}
 	

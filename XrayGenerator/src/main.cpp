@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 #define SAN_PIN 2
-#define SINGLE_SHOT_COUNT 3
+#define SINGLE_SHOT_COUNT 1
 #define SERIES_MOTION_SHOT_COUNT 10
 #define FLOURO_SHOT_COUNT 4
 

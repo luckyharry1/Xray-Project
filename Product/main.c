@@ -134,7 +134,7 @@ int main(int argc, char* argv[])
 					printf("Enter the name of the patient you would like to remove:\n");
 
 					char name[MAX_NAME];
-					if (scanf("%s", &name) != 1){
+					if (scanf("%s", name) != 1){
 						printf("ERROR: Invalid Input.");
 					break;
 					}
