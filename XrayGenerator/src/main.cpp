@@ -1,4 +1,4 @@
-#include "COMM_PROTOCOL.h"
+#include "../../Interface_CentralAcq_Devices/COMM_PROTOCOL.h"
 #include <Wire.h>
 #include <Arduino.h>
 
@@ -7,64 +7,169 @@
 #define SERIES_MOTION_SHOT_COUNT 10
 #define FLOURO_SHOT_COUNT 4
 
-static uint8_t lastResponse = NAK;
-static uint8_t lastPayloadOutgoing  = 0x00;
-static uint8_t lastPayloadIncoming = 0x00;
+#define EXAM_ARMED_TIMEOUT_MS    60000   // time between MSG_START and first SAN LOW
+#define EXAM_FIRING_TIMEOUT_MS   10000   // hard cap on actual firing once SAN first goes LOW for all besides single shot
 
+// Variables shared between the Wire ISR and loop().
+volatile bool      examActive    = false;
+volatile ExamType  requestedExam = EXAM_TYPE_NONE;
+volatile uint8_t   lastResponse         = NAK;
+volatile uint8_t   lastPayloadOutgoing  = 0x00;
+volatile uint8_t   lastPayloadIncoming  = 0x00;
+
+
+bool sanLow = false;
 
 void onReceive(int numBytes);
 void onRequest();
-void handleMessage(MsgType type);
 
 void setup() {
-  cli(); //disable all interrupts
+  cli();
   Serial.begin(9600);
   Wire.begin(I2C_ADDR_SLAVE_1);
   Wire.onReceive(onReceive);
   Wire.onRequest(onRequest);
 
-  DDRB = DDRB | 0x01; // Set pin 8 as output pin, 9-12 to input
+  DDRB = DDRB | 0x01;       // pin 8 = X-ray fire output
+  PORTB = PORTB & ~0x01;    // ensure OFF
+  pinMode(SAN_PIN, INPUT);  // idle: listen for master / Geometry
 
-  sei(); //enable all interrupts
+  sei();
 }
 
+// Exam state machine
+
 void loop() {
- // ADD BOOL IF DATA READY SAN = LOW
+  static ExamType    currentExam   = EXAM_TYPE_NONE;
+  static unsigned long examStartMs = 0;   // when MSG_START arrived (armed)
+  static int         shotCount     = 0;
+
+  // if exam starts set start parameters
+  if (examActive && currentExam == EXAM_TYPE_NONE) {
+    currentExam = requestedExam;
+    examStartMs = millis();
+    shotCount   = 0;
+    pinMode(SAN_PIN, INPUT);
+  }
+
+  if (currentExam != EXAM_TYPE_NONE && millis() - examStartMs >= EXAM_ARMED_TIMEOUT_MS) {
+    examActive = false;
+  }
+
+  // System reset when exam is done
+  if (examActive != true && currentExam != EXAM_TYPE_NONE) {
+    PORTB = PORTB & ~0x01;        // ensure LED is OFF
+    pinMode(SAN_PIN, OUTPUT);     // slave drives SAN to signal data-ready
+    currentExam = EXAM_TYPE_NONE;
+    return;
+  }
+
+  if (examActive == false) {
+    return;
+  }
+ // RETURN SET, below is only if exam is set.
+  if (digitalRead(SAN_PIN == LOW)){
+   sanLow = true;
+  } else {
+    sanLow = false;
+  }
+
+  switch (currentExam) {
+    case EXAM_TYPE_SINGLE_SHOT:
+      if (sanLow) {
+        PORTB = PORTB | 0x01;
+        delay(10);
+        PORTB = PORTB & ~0x01;
+        lastPayloadOutgoing = 0x01;  // dose result (hardcoded for now)
+        examActive = false;
+      }
+      break;
+
+    case EXAM_TYPE_SERIES:
+      if (sanLow) {
+        PORTB = PORTB | 0x01;
+        delay(10);
+        PORTB = PORTB & ~0x01;
+        delay(490);
+        shotCount++;
+      } else if (shotCount > 0) {
+        lastPayloadOutgoing = 0x01;
+        examActive = false;
+      }
+      break;
+
+    case EXAM_TYPE_SERIES_WITH_MOTION:
+      if (shotCount >= SERIES_MOTION_SHOT_COUNT) {
+        lastPayloadOutgoing = 0x01;
+        examActive = false;
+      }
+      if (sanLow) {
+        PORTB = PORTB | 0x01;
+        delay(10);
+        PORTB = PORTB & ~0x01;
+        delay(490);
+        shotCount++;
+      }
+      break;
+
+    case EXAM_TYPE_FLUORO:
+      if (shotCount >= FLOURO_SHOT_COUNT) {
+        lastPayloadOutgoing = 0x01;
+        examActive = false;
+      }
+      if (sanLow) {
+        PORTB = PORTB | 0x01;
+        delay(10);
+        PORTB = PORTB & ~0x01;
+        delay(240);
+        shotCount++;
+      } 
+      break;
+
+    default:
+      examActive = false;
+      break;
+  }
 }
 
 void onReceive(int numBytes) {
   uint8_t msgType = Wire.read();
-  uint8_t msg = Wire.read();
+  uint8_t msg     = Wire.read();
   lastPayloadIncoming = msg;
 
-  Serial.print("type=0x"); Serial.println(msgType, HEX);
-
-  if (msg != 0x00){
-    Serial.print("Incoming=0x"); Serial.println(msg, HEX);
-  }
-
-  switch ((MsgType) msgType) {
+  switch ((MsgType)msgType) {
     case MSG_HEARTBEAT:
-      handleMessage(MSG_HEARTBEAT);
       lastResponse = ACK;
       break;
+
     case MSG_START:
-      handleMessage(MSG_START);
+      if ((ExamType)msg != EXAM_TYPE_NONE) {
+        requestedExam = (ExamType)msg;
+        lastPayloadOutgoing = 0x00;   // clear old dose
+        examActive = true;   // for loop()
+      }
       lastResponse = ACK;
       break;
+
     case MSG_STOP:
-      handleMessage(MSG_STOP);
-      lastResponse = ACK;
+      // Any MSG_STOP returns to idle.
+      examActive          = false;
+      lastPayloadOutgoing = 0x00;
+      lastResponse        = ACK;
       break;
-    case MSG_ERROR:
-    //FUTURE PROOFING
-      break;
+
     case MSG_DATA_READY:
-      handleMessage(MSG_DATA_READY);
+      // lastPayloadOutgoing is currently hard coded.
       lastResponse = ACK;
       break;
+
+    case MSG_ERROR:
+      // future expansion
+      break;
+
     default:
       lastResponse = NAK;
+
       break;
   }
 }
@@ -72,95 +177,5 @@ void onReceive(int numBytes) {
 void onRequest() {
   Wire.write(lastResponse);
   Wire.write(lastPayloadOutgoing);
-  Serial.print("Response=0x"); Serial.print(lastResponse, HEX);
-  Serial.print(" Payload=0x"); Serial.println(lastPayloadOutgoing, HEX);
   lastResponse = NAK;
-  
-}
-
-void handleMessage(MsgType type){
-  switch (type) {
-    case MSG_START:
-      switch(lastPayloadIncoming) {
-        case EXAM_TYPE_NONE:
-          PORTB = PORTB & ~0x01;
-        break;
-
-        case EXAM_TYPE_SINGLE_SHOT: //ADD TIMER FOR TIMEOUT
-          pinMode(SAN_PIN, INPUT);
-            int shotCount = 0;
-
-            while(shotCount < SINGLE_SHOT_COUNT){
-              if (digitalRead(SAN_PIN)==LOW){
-                PORTB = PORTB | 0x01;
-                delay(10);
-                PORTB = PORTB & ~0x01;
-                shotCount++;
-              }
-            }
-            pinMode(SAN_PIN,OUTPUT);
-
-        break;
-
-        case EXAM_TYPE_SERIES:
-          pinMode(SAN_PIN, INPUT);
-
-          while(digitalRead(SAN_PIN) == HIGH){
-            //ADD TIMEOUT
-          }
-          while(digitalRead(SAN_PIN) == LOW){
-            PORTB = PORTB ^ 0x01;
-            delay(10);
-            PORTB = PORTB ^ 0x01;
-            delay(490);
-          }
-          pinMode(SAN_PIN,OUTPUT);
-        break;
-
-        case EXAM_TYPE_SERIES_WITH_MOTION:
-          pinMode(SAN_PIN, INPUT);
-          int shotCount = 0;
-
-          while(shotCount < SERIES_MOTION_SHOT_COUNT || lastResponse == NAK){ // ADD TIMER FOR TIMEOUT
-            if (digitalRead(SAN_PIN) == LOW){
-              PORTB = PORTB ^ 0x01;
-              delay(10);
-              PORTB = PORTB ^ 0x01;
-              delay(490);
-              shotCount++;
-            }
-          }
-          pinMode(SAN_PIN,OUTPUT);
-        break;
-
-        case EXAM_TYPE_FLUORO:
-          int shotCount = 0;
-          pinMode(SAN_PIN, INPUT);
-
-          while(digitalRead(SAN_PIN) == HIGH){
-            //ADD TIMEOUT
-          }
-          while(shotCount < FLOURO_SHOT_COUNT || digitalRead(SAN_PIN) == LOW){ // ADD TIMEOUT
-            PORTB = PORTB ^ 0x01;
-            delay(10);
-            PORTB = PORTB ^ 0x01;
-            delay(240);
-            shotCount++;
-          }
-          pinMode(SAN_PIN,OUTPUT);
-          
-        break;
-      }
-      break;
-    case MSG_STOP:
-      lastPayloadOutgoing = 0x00; //RESETS THE RESPONSE, DATA CAN BE READ ONLY ONCE UNTIL RE-REQUEST
-      break;
-    case MSG_HEARTBEAT:
-    case MSG_DATA_READY:
-      lastPayloadOutgoing = 0x01; //HARDCODED FOR NOW, THIS WOULD BE SENSOR DATA
-      break;
-    case MSG_ERROR:
-    default:
-      break;
-  }
 }

@@ -237,3 +237,11 @@ int8_t addPatientDose(uint16_t dosage){
     selectedPatient->doseCount++;
 	return 0;
 }
+
+//int8_t writeToFile(char * filePath){
+
+//}
+
+//int8_t readFromFile(char * filePath){
+
+//}

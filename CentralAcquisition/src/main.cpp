@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "../../Interface_PatAdmin_CentralAcq/Protocol_PatientAdmin_CentralAcq.h"
-#include "COMM_PROTOCOL.h"
+#include "../../Interface_CentralAcq_Devices/COMM_PROTOCOL.h"
 
 #define MAX_RETRIES 3
 
@@ -13,6 +13,10 @@
 #define SAN_PIN 2
 #define PREPARE_BUTTON_PIN 8
 #define XRAY_BUTTON_PIN 9
+
+#define I2C_RESPONSE_TIMEOUT_MS  200    // wait for slave to put bytes on the bus
+#define PREPARE_TIMEOUT_MS       5000   // give up STATE_PREPARING if no slave responds
+#define DATA_READY_TIMEOUT_MS    2000   // give up polling MSG_DATA_READY
 
 static ExamType currentExamType = EXAM_TYPE_NONE;
 bool slaveOneReady = false;
@@ -53,6 +57,7 @@ void EXAM_SERIES();
 void EXAM_SERIES_WITH_MOTION();
 void EXAM_FLOURO();
 bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg);
+bool debounceButton(uint8_t pin);
 
 void handleEvent(EVENTS event) //Check state and handle incoming events
 {
@@ -91,49 +96,51 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
                 currentExamType = EXAM_TYPE_FLUORO;
             }
             else if (event == EV_PREPARE_BUTTON_PRESSED && currentExamType != EXAM_TYPE_NONE){
-                pinMode(SAN_PIN, OUTPUT);
-
                 analogWrite(GRNLED, 255);
                 analogWrite(REDLED, 0);
-
-                sendMessage(I2C_ADDR_SLAVE_1, MSG_START, currentExamType);
-
                 centralAcqState = STATE_PREPARING;
             }
             break;
-        case STATE_PREPARING:
+        case STATE_PREPARING: {
+            static unsigned long prepStart = 0;
+            if (prepStart == 0) {
+                prepStart = millis();
+            }
+
             analogWrite(GRNLED, 100);
             analogWrite(REDLED, 100);
-            if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, currentExamType) == true){
-                slaveOneReady = true;
-            }
-            if (sendMessage(I2C_ADDR_SLAVE_2, MSG_START, currentExamType) == true){
-                slaveTwoReady = true;
-            }
-            if (slaveOneReady || slaveTwoReady){
-                centralAcqState = STATE_ACQUIRING;
-            }
-            if (event == EV_PREPARE_BUTTON_PRESSED){
-                if (event == EV_IDLE){
-                    analogWrite(GRNLED, 0);
-                    analogWrite(REDLED, 0);
-                    currentExamType = EXAM_TYPE_SERIES;
-                    centralAcqState = STATE_CONNECTED;
-                    break;
-                }
-                centralAcqState = STATE_ACQUIRING;
-            }
-            break;
 
-        case STATE_ACQUIRING:
-            pinMode(SAN_PIN, OUTPUT);
+            if (!slaveOneReady) {
+                slaveOneReady = sendMessage(I2C_ADDR_SLAVE_1, MSG_START, currentExamType);
+            }
+            if (!slaveTwoReady) {
+                slaveTwoReady = sendMessage(I2C_ADDR_SLAVE_2, MSG_START, currentExamType);
+            }
+
+            if (slaveOneReady || slaveTwoReady) {
+                centralAcqState = STATE_ACQUIRING;
+                prepStart = 0;
+            } else if (millis() - prepStart >= PREPARE_TIMEOUT_MS) {
+                Serial.println("PREPARE TIMEOUT, no slave responded");
+                analogWrite(GRNLED, 0);
+                analogWrite(REDLED, 0);
+                currentExamType = EXAM_TYPE_NONE;
+                centralAcqState = STATE_CONNECTED;
+                prepStart = 0;
+            }
+        } break;
+
+        case STATE_ACQUIRING: {
             analogWrite(REDLED, 255);
             analogWrite(GRNLED, 0);
+
             switch(currentExamType)
             {
                 case EXAM_TYPE_NONE: // MANAGE ERROR HANDLING TO THE REST
-                break;
+                    break;
                 case EXAM_TYPE_SINGLE_SHOT:
+                    pinMode(SAN_PIN, OUTPUT);
+                    digitalWrite(SAN_PIN, HIGH);
                     if (digitalRead(XRAY_BUTTON_PIN) == LOW)
                     {
                         digitalWrite(SAN_PIN, LOW);
@@ -142,38 +149,40 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
                     }
                     break;
                 case EXAM_TYPE_SERIES:
-                    while (digitalRead(XRAY_BUTTON_PIN) == LOW)
-                    {
-                        digitalWrite(SAN_PIN, LOW);
-                    }
-                    digitalWrite(SAN_PIN, HIGH);
-                    break;
-                case EXAM_TYPE_SERIES_WITH_MOTION: // FIGURE OUT LOGIC FOR WHEN DONE
-                    pinMode(SAN_PIN, INPUT);
-                    
-                    break;
                 case EXAM_TYPE_FLUORO:
+                    pinMode(SAN_PIN, OUTPUT);
+                    digitalWrite(SAN_PIN, HIGH);
                     while (digitalRead(XRAY_BUTTON_PIN) == LOW)
                     {
                         digitalWrite(SAN_PIN, LOW);
                     }
                     digitalWrite(SAN_PIN, HIGH);
                     break;
-                break;
-
+                case EXAM_TYPE_SERIES_WITH_MOTION:
+                    // Geometry drives SAN here — master must release.
+                    pinMode(SAN_PIN, INPUT);
+                    break;
             }
-            
-            sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
+
+            // Release SAN so the XrayGenerator can drive it
             pinMode(SAN_PIN, INPUT);
-            while (lastPayload == 0x00){
+            
+            lastPayload = 0x00;
+            unsigned long doseStart = millis();
+            while (lastPayload == 0x00 && millis() - doseStart < DATA_READY_TIMEOUT_MS) { //EDIT TO USE SAN BUS
                 sendMessage(I2C_ADDR_SLAVE_1, MSG_DATA_READY, 0x00);
             }
-            writeMsgToSerialPort("DOSE:"); // INT TO STRING
-            Serial.println("DOSE:" + lastPayload);
-            centralAcqState = STATE_CONNECTED; // LOGIC FOR RETURNING READINGS
+            sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
+
+            char doseMsg[16];
+            printf("DOSE:%u", lastPayload);
+            writeMsgToSerialPort(doseMsg);
+            Serial.print("DOSE:"); Serial.println(lastPayload);
+
+            centralAcqState = STATE_CONNECTED;
             slaveOneReady = false;
             slaveTwoReady = false;
-            break;
+        } break;
     }   
 }
 
@@ -293,11 +302,9 @@ bool debounceButton(uint8_t pin) {
 
 
 bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg) {
-    for (uint8_t i = 0; i < MAX_RETRIES; i++){
-    //Serial.print("ATTEMPTING #"); Serial.println(i);
+    for (uint8_t i = 0; i < MAX_RETRIES; i++) {
         Serial.print("Type: "); Serial.print(msgType, HEX);
-        //Serial.print("Message: "); Serial.println(msg);
-        
+
         Wire.beginTransmission(slaveAddr);
         Wire.write((uint8_t)msgType);
         Wire.write(msg);
@@ -305,38 +312,32 @@ bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg) {
 
         delay(100);
 
-        bool recieveStatus = false;
-        while(recieveStatus == false){
+        Wire.requestFrom((uint8_t)slaveAddr, (uint8_t)2);
 
-            Wire.requestFrom((uint8_t)slaveAddr, (uint8_t)2);
-
-            if (Wire.available() >= 2) {
-                uint8_t response = Wire.read();
-                lastPayload = Wire.read();
-                if (response == ACK){
-                    Serial.println("\tACK");
-                    recieveStatus = true;
-
-                    if (lastPayload != 0x00){
-                        Serial.print("MESSAGE: 0x"); Serial.println(lastPayload, HEX);
-                    }
-                    return true;
-                } else if (response == NAK){
-                    Serial.println("NAK, slave not ready yet");
-                    recieveStatus = false;
-                } else {
-                    Serial.println("UNKNOWN RESPONSE");
-                    recieveStatus = false;
-                }
-
-            Serial.println("ACK NOT RECIEVED");
-            
-            } else {
-                Serial.println("NO RESPONSE, DEVICE MAY BE UNAVALIABLE");
-            }
-
-            delay(100);
+        unsigned long waitStart = millis();
+        while (Wire.available() < 2 && millis() - waitStart < I2C_RESPONSE_TIMEOUT_MS) {
+            // wait shortly for the slave to send data
         }
+
+        if (Wire.available() >= 2) {
+            uint8_t response = Wire.read();
+            lastPayload = Wire.read();
+            if (response == ACK) {
+                Serial.println("\tACK");
+                if (lastPayload != 0x00) {
+                    Serial.print("MESSAGE: 0x"); Serial.println(lastPayload, HEX);
+                }
+                return true;
+            } else if (response == NAK) {
+                Serial.println("NAK, slave not ready yet");
+            } else {
+                Serial.println("UNKNOWN RESPONSE");
+            }
+        } else {
+            Serial.println("NO RESPONSE, DEVICE MAY BE UNAVAILABLE");
+        }
+
+        delay(100);
     }
 
     Serial.println("Failed after retries exceeded");

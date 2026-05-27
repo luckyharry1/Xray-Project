@@ -78,7 +78,7 @@ int8_t addPatientDose(uint16_t dosage);
  * Returns 0 on success
  * Returns -1 on failure
  */
-//int8_t writeToFile(char * filePath);
+int8_t writeToFile(char * filePath);
 
 
 /***************************************************************************************
@@ -87,6 +87,6 @@ int8_t addPatientDose(uint16_t dosage);
  * Returns 0 on success
  * Returns -1 on failure
  */
-//int8_t readFromFile(char * filePath);
+int8_t readFromFile(char * filePath);
 
 #endif

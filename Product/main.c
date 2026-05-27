@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
 {
 	static CENTRAL_ACQUISITION_CONNECTION_STATE centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
 		
-	initHashTable();
+	initPatientDoseAdmin();
 	
 	if (connectWithCentralAcquisition()) {	
 		centralAcqConnectionState = CONNECTED_WITH_CENTRAL_ACQUISITION;
