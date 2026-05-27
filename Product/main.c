@@ -151,7 +151,7 @@ int main(int argc, char* argv[])
 				case MO_SELECT_EXAMINATION_TYPE:{
 					system("clear");
 					if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
-						uint32_t doseData;
+						uint16_t doseData;
 						uint8_t examType;
 						
 						printf("Exam Type Menu\n[0]\tNO EXAM TYPE\n[1]\tSINGLE SHOT EXAM\n[2]\tSERIES EXAM\n[3]\tSERIES WITH MOTION\n[4]\tFLOURO EXAM\n");
@@ -178,7 +178,10 @@ int main(int argc, char* argv[])
 								selectExaminationType(EXAM_TYPE_FLUORO);
 								break;
 						}
+						if (examType != EXAM_TYPE_NONE){
+							getDoseDataFromCentralAcquisition(&doseData);
 
+						}
 						//if (getDoseDataFromCentralAcquisition(&doseData)) {
 						//	printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
 						//}

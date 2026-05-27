@@ -17,8 +17,10 @@
 #define I2C_RESPONSE_TIMEOUT_MS  200    // wait for slave to put bytes on the bus
 #define PREPARE_TIMEOUT_MS       5000   // give up STATE_PREPARING if no slave responds
 #define DATA_READY_TIMEOUT_MS    2000   // give up polling MSG_DATA_READY
+#define BUTTON_TIMEOUT_MS        10000   // time to wait on button press
 
 static ExamType currentExamType = EXAM_TYPE_NONE;
+unsigned long lastPress = 0;
 bool slaveOneReady = false;
 bool slaveTwoReady = false;
 uint8_t lastPayload = 0x00;
@@ -32,7 +34,6 @@ typedef enum {
     EV_EXAM_SERIES_WITH_MOTION,
     EV_EXAM_FLUORO,
     EV_PREPARE_BUTTON_PRESSED,
-    EV_XRAY_BUTTON_PRESSED,
     EV_NO_EVENT,
 } EVENTS;
 
@@ -75,24 +76,19 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
                 centralAcqState = STATE_DISCONNECTED;
                 writeMsgToSerialPort(DISCONNECT_MSG);
             } else if (event == EV_IDLE){
-                centralAcqState = STATE_PREPARING;
                 currentExamType = EXAM_TYPE_NONE;
             } 
             else if (event == EV_EXAM_SINGLE_SHOT) {
-                centralAcqState = STATE_PREPARING;
                 currentExamType = EXAM_TYPE_SINGLE_SHOT;
             } 
             else if (event == EV_EXAM_SERIES) {
-                centralAcqState = STATE_PREPARING;
                 currentExamType = EXAM_TYPE_SERIES;
             }
             else if (event == EV_EXAM_SERIES_WITH_MOTION) {
-                centralAcqState = STATE_PREPARING;
                 currentExamType = EXAM_TYPE_SERIES_WITH_MOTION;
                 
             }
             else if (event == EV_EXAM_FLUORO) {
-                centralAcqState = STATE_PREPARING;
                 currentExamType = EXAM_TYPE_FLUORO;
             }
             else if (event == EV_PREPARE_BUTTON_PRESSED && currentExamType != EXAM_TYPE_NONE){
@@ -136,32 +132,49 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
 
             switch(currentExamType)
             {
-                case EXAM_TYPE_NONE: // MANAGE ERROR HANDLING TO THE REST
-                    break;
-                case EXAM_TYPE_SINGLE_SHOT:
+                case EXAM_TYPE_NONE: { // MANAGE ERROR HANDLING TO THE REST
+                } break;
+                case EXAM_TYPE_SINGLE_SHOT: {
                     pinMode(SAN_PIN, OUTPUT);
                     digitalWrite(SAN_PIN, HIGH);
+                    unsigned long int timeOut = millis();
+                    while (debounceButton(XRAY_BUTTON_PIN) == false && millis() - timeOut <= BUTTON_TIMEOUT_MS){
+                    }
                     if (digitalRead(XRAY_BUTTON_PIN) == LOW)
                     {
                         digitalWrite(SAN_PIN, LOW);
                         delay(50);
                         digitalWrite(SAN_PIN, HIGH);
                     }
-                    break;
-                case EXAM_TYPE_SERIES:
-                case EXAM_TYPE_FLUORO:
+                } break;
+                case EXAM_TYPE_SERIES: {
                     pinMode(SAN_PIN, OUTPUT);
                     digitalWrite(SAN_PIN, HIGH);
+                    unsigned long timeOut = millis();
+                    while (debounceButton(XRAY_BUTTON_PIN) == false && millis() - timeOut <= BUTTON_TIMEOUT_MS){}
+
                     while (digitalRead(XRAY_BUTTON_PIN) == LOW)
                     {
                         digitalWrite(SAN_PIN, LOW);
                     }
                     digitalWrite(SAN_PIN, HIGH);
-                    break;
-                case EXAM_TYPE_SERIES_WITH_MOTION:
+                } break;
+                case EXAM_TYPE_FLUORO:{
+                    pinMode(SAN_PIN, OUTPUT);
+                    digitalWrite(SAN_PIN, HIGH);
+                    unsigned long timeOut = millis();
+                    while (debounceButton(XRAY_BUTTON_PIN) == false || millis() - timeOut >= BUTTON_TIMEOUT_MS){}
+
+                    while (digitalRead(XRAY_BUTTON_PIN) == LOW)
+                    {
+                        digitalWrite(SAN_PIN, LOW);
+                    }
+                    digitalWrite(SAN_PIN, HIGH);
+                } break;
+                case EXAM_TYPE_SERIES_WITH_MOTION: {
                     // Geometry drives SAN here — master must release.
                     pinMode(SAN_PIN, INPUT);
-                    break;
+                } break;
             }
 
             // Release SAN so the XrayGenerator can drive it
@@ -169,13 +182,21 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
             
             lastPayload = 0x00;
             unsigned long doseStart = millis();
+            unsigned long tempTime = 0;
             while (lastPayload == 0x00 && millis() - doseStart < DATA_READY_TIMEOUT_MS) { //EDIT TO USE SAN BUS
-                sendMessage(I2C_ADDR_SLAVE_1, MSG_DATA_READY, 0x00);
+                if (tempTime == 0){
+                    tempTime = millis();
+                }
+                if (millis() - tempTime >= 1000){
+                    sendMessage(I2C_ADDR_SLAVE_1, MSG_DATA_READY, 0x00);
+                    tempTime = 0;
+                }
+
             }
             sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
 
             char doseMsg[16];
-            printf("DOSE:%u", lastPayload);
+            snprintf(doseMsg, sizeof(doseMsg), "DOSE:%u", lastPayload);
             writeMsgToSerialPort(doseMsg);
             Serial.print("DOSE:"); Serial.println(lastPayload);
 
@@ -214,9 +235,6 @@ EVENTS getEvent() //Only checks whether a connect/disconnect message is recieved
     }
     if (debounceButton(PREPARE_BUTTON_PIN) == true){
         return EV_PREPARE_BUTTON_PRESSED;
-    }
-    if (debounceButton(XRAY_BUTTON_PIN) == true){
-        return EV_XRAY_BUTTON_PRESSED;
     }
     return EV_NO_EVENT;
 }
@@ -281,7 +299,7 @@ void setup() {
 void loop() {
     handleEvent(getEvent());
 
-    // below some dummy code that sends dose data to the patient admin. Remove this dummy code asap.
+    /*// below some dummy code that sends dose data to the patient admin. Remove this dummy code asap.
     static unsigned long timeOut = millis();
     static int doseCnt = 0;
     unsigned long curTime = millis();
@@ -289,14 +307,18 @@ void loop() {
         Serial.print("$DOSE:"); Serial.print(doseCnt); Serial.println("#");
         timeOut = curTime + 5000;
         doseCnt++;
-    }
+    }*/
 }
 
 bool debounceButton(uint8_t pin) {
-    if (digitalRead(pin) == LOW) {
-        delay(20);
-        return true;
+    if (millis() - lastPress >= 20){
+        if (digitalRead(pin) == LOW) {
+            delay(20);
+            lastPress = millis();
+            return true;
+        }
     }
+
     return false;
 }
 

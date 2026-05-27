@@ -17,8 +17,6 @@ Patient* hashTable[TABLE_SIZE]; // NULL = empty slot
 
 Patient* selectedPatient = NULL;
 
-static Patient* johnDoePtr = NULL;
-
 //int8_t patientDoseInPeriod(char * patientName,
 //                           date* startDate, date* endDate, uint32_t* totalDose){
 //	 return -1;
@@ -63,8 +61,23 @@ void initPatientDoseAdmin(){
     }
 
     addPatient("JohnDoe");
-    johnDoePtr = isPatientPresent("JohnDoe");
     selectPatient("JohnDoe");
+}
+
+void resetPatientDoseAdmin(){
+    Patient* current = NULL;
+    Patient* next = NULL;
+    selectedPatient = NULL;
+
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        current = hashTable[i];
+        while(current != NULL){
+            next = current->next;
+            free(current);
+            current = next;
+        }
+        hashTable[i] = NULL;
+    }
 }
 
 
@@ -92,7 +105,7 @@ void printTable(){ //FOR DEBUGGING
 
 void toLowercase(char *nameLowercase, const char *name){
     size_t i;
-    for (i = 0; i < MAX_NAME - 1 && name[i] != '\0'; i++){
+    for (i = 0; i < MAX_NAME && name[i] != '\0'; i++){
         nameLowercase[i] = (char)tolower(name[i]);
     }
     nameLowercase[i] = '\0';
@@ -101,33 +114,35 @@ void toLowercase(char *nameLowercase, const char *name){
 
 // you need to read the header file (return values)
 int8_t addPatient(char *name){
+    if (sizeof(name[80]) > sizeof(char)){
+        return -1;
+    }
     char nameLowercase[MAX_NAME];
     toLowercase(nameLowercase, name);
 
     int index = hash(nameLowercase);
-    
-    Patient* tempPat = malloc(sizeof(Patient)); // free function for freeing memory, otherwise memory will stay allocated
+
+    if (isPatientPresent(name) != NULL){
+        return -1;
+    }
+
+    Patient* tempPat = calloc(1, sizeof(Patient)); // free function for freeing memory, otherwise memory will stay allocated
 
     if (tempPat == NULL){
         return -3; // HEAP FULL
     }
     
-    strncpy(tempPat->name, nameLowercase, MAX_NAME - 1);
-    tempPat->doseCount = 0;
+    strncpy(tempPat->name, nameLowercase, MAX_NAME);
 
     if (hashTable[index] == NULL) {
         hashTable[index] = tempPat;
-        hashTable[index]->next = NULL;
     } else {
+        hashTable[index]->prev = tempPat;
         tempPat->next = hashTable[index];
         hashTable[index] = tempPat;
     }
 
-    if (isPatientPresent(name) != NULL){
-        return 0;
-    }
-
-    return -1;
+    return 0;
 }
 
 
@@ -168,7 +183,7 @@ void managePatient(){
     char patientName[MAX_NAME];
     strncpy(patientName, selectedPatient->name, MAX_NAME);
 
-    handlePatientSelection(patientName);
+//    handlePatientSelection(patientName);
     return;
 }
 
@@ -188,18 +203,29 @@ int8_t removePatient(char *name){
     if (strncmp("johndoe", inputNameLowercase, MAX_NAME) == 0){
         return -1;
     }
+    if (strncmp(ptr->name, inputNameLowercase, MAX_NAME) != 0){
+        return -1;
+    }
+    
 
-    if (strncmp(ptr->name, inputNameLowercase, MAX_NAME) == 0){ // if patient is at the head of the chain
-        if (hashTable[index]->next != NULL){
-            hashTable[index] = hashTable[index]->next;
-        } else {
-            hashTable[index] = NULL;
-        }
+    if (ptr->prev == NULL){ //head of chain
+        hashTable[index] = ptr->next;
         free(ptr);
         return 0;
     }
 
-    Patient *current = hashTable[index]; // start at head 
+    if (ptr->next == NULL){ //Tail of chain
+        ptr->prev->next = NULL;
+        free(ptr);
+        return 0;
+    }
+        
+    ptr->next->prev = ptr->prev;
+    ptr->prev->next = ptr->next;
+    free(ptr);
+    return 0;
+
+    /*Patient *current = hashTable[index]; // start at head 
     Patient* prev = NULL;
     while(current != NULL){
         if(strncmp(current->name, inputNameLowercase, MAX_NAME) == 0){
@@ -211,10 +237,7 @@ int8_t removePatient(char *name){
         }
         prev = current;
         current = current->next;
-        
-    }
-
-    return -1;
+    }*/
 }
 
 
