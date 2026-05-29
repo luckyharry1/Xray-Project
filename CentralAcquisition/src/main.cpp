@@ -12,15 +12,15 @@
 #define REDLED 6
 #define SAN_PIN 2
 #define PREPARE_BUTTON_PIN 8
-#define XRAY_BUTTON_PIN 9
+#define XRAY_BUTTON_PIN 10
 
 #define I2C_RESPONSE_TIMEOUT_MS  200    // wait for slave to put bytes on the bus
 #define PREPARE_TIMEOUT_MS       5000   // give up STATE_PREPARING if no slave responds
+#define PREPARED_INTERVAL_MS     500    // ms between I2C broadcasts inside STATE_PREPARING
 #define DATA_READY_TIMEOUT_MS    2000   // give up polling MSG_DATA_READY
-#define BUTTON_TIMEOUT_MS        10000   // time to wait on button press
+#define BUTTON_TIMEOUT_MS        10000  // time to wait on button press
 
 static ExamType currentExamType = EXAM_TYPE_NONE;
-unsigned long lastPress = 0;
 bool slaveOneReady = false;
 bool slaveTwoReady = false;
 uint8_t lastPayload = 0x00;
@@ -72,6 +72,10 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
             }
             break;
         case STATE_CONNECTED:
+            if (event == EV_CONNECT_MSG_RECEIVED) {
+                writeMsgToSerialPort(CONNECT_MSG);
+                break;
+            }
             if (event == EV_DISCONNECT_MSG_RECEIVED) {
                 centralAcqState = STATE_DISCONNECTED;
                 writeMsgToSerialPort(DISCONNECT_MSG);
@@ -92,37 +96,64 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
                 currentExamType = EXAM_TYPE_FLUORO;
             }
             else if (event == EV_PREPARE_BUTTON_PRESSED && currentExamType != EXAM_TYPE_NONE){
-                analogWrite(GRNLED, 255);
-                analogWrite(REDLED, 0);
                 centralAcqState = STATE_PREPARING;
             }
             break;
+            
         case STATE_PREPARING: {
-            static unsigned long prepStart = 0;
+            static unsigned long prepStart     = 0;
+            static unsigned long lastBroadcast = 0;
+
+            // Initialise timers on first entry to this state.
             if (prepStart == 0) {
-                prepStart = millis();
+                prepStart     = millis();
+                lastBroadcast = 0;   // force an immediate first broadcast
             }
+
+            if (event == EV_IDLE) {
+                // PatientAdmin cancelled the exam while we were preparing
+                Serial.println("[PREPARING] Exam cancelled by PatientAdmin");
+                currentExamType = EXAM_TYPE_NONE;
+                slaveOneReady = slaveTwoReady = false;
+                prepStart = lastBroadcast = 0;
+                centralAcqState = STATE_CONNECTED;
+                break;
+            }
+
 
             analogWrite(GRNLED, 100);
             analogWrite(REDLED, 100);
 
-            if (!slaveOneReady) {
-                slaveOneReady = sendMessage(I2C_ADDR_SLAVE_1, MSG_START, currentExamType);
-            }
-            if (!slaveTwoReady) {
-                slaveTwoReady = sendMessage(I2C_ADDR_SLAVE_2, MSG_START, currentExamType);
+            if (millis() - lastBroadcast >= PREPARED_INTERVAL_MS) {
+                lastBroadcast = millis();
+
+                Serial.print("[PREPARING] Broadcasting exam 0x");
+                Serial.println((uint8_t)currentExamType, HEX);
+
+                if (!slaveOneReady) {
+                    slaveOneReady = sendMessage(I2C_ADDR_SLAVE_1, MSG_START, currentExamType);
+                }
+                // Uncomment when Geometry (SLAVE_2) is implemented:
+                // if (!slaveTwoReady) {
+                //     slaveTwoReady = sendMessage(I2C_ADDR_SLAVE_2, MSG_START, currentExamType);
+                // }
             }
 
+            // ── Transition checks ─────────────────────────────────────────
             if (slaveOneReady || slaveTwoReady) {
+                Serial.println("[PREPARING] Slave ready – moving to ACQUIRING");
+                analogWrite(GRNLED, 255);
+                analogWrite(REDLED, 0);
                 centralAcqState = STATE_ACQUIRING;
-                prepStart = 0;
+                prepStart = lastBroadcast = 0;
             } else if (millis() - prepStart >= PREPARE_TIMEOUT_MS) {
-                Serial.println("PREPARE TIMEOUT, no slave responded");
+                Serial.println("[PREPARING] TIMEOUT – no slave responded");
                 analogWrite(GRNLED, 0);
                 analogWrite(REDLED, 0);
                 currentExamType = EXAM_TYPE_NONE;
+                slaveOneReady = slaveTwoReady = false;
                 centralAcqState = STATE_CONNECTED;
-                prepStart = 0;
+                prepStart = lastBroadcast = 0;
             }
         } break;
 
@@ -135,50 +166,43 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
                 case EXAM_TYPE_NONE: { // MANAGE ERROR HANDLING TO THE REST
                 } break;
                 case EXAM_TYPE_SINGLE_SHOT: {
-                    pinMode(SAN_PIN, OUTPUT);
-                    digitalWrite(SAN_PIN, HIGH);
                     unsigned long int timeOut = millis();
                     while (debounceButton(XRAY_BUTTON_PIN) == false && millis() - timeOut <= BUTTON_TIMEOUT_MS){
                     }
                     if (digitalRead(XRAY_BUTTON_PIN) == LOW)
                     {
+                        pinMode(SAN_PIN, OUTPUT);
                         digitalWrite(SAN_PIN, LOW);
                         delay(50);
-                        digitalWrite(SAN_PIN, HIGH);
+                        pinMode(SAN_PIN, INPUT);
                     }
                 } break;
                 case EXAM_TYPE_SERIES: {
-                    pinMode(SAN_PIN, OUTPUT);
-                    digitalWrite(SAN_PIN, HIGH);
                     unsigned long timeOut = millis();
                     while (debounceButton(XRAY_BUTTON_PIN) == false && millis() - timeOut <= BUTTON_TIMEOUT_MS){}
 
-                    while (digitalRead(XRAY_BUTTON_PIN) == LOW)
-                    {
+                    if (digitalRead(XRAY_BUTTON_PIN) == LOW) {
+                        pinMode(SAN_PIN, OUTPUT);
                         digitalWrite(SAN_PIN, LOW);
+                        while (digitalRead(XRAY_BUTTON_PIN) == LOW) { }
+                        pinMode(SAN_PIN, INPUT);
                     }
-                    digitalWrite(SAN_PIN, HIGH);
                 } break;
                 case EXAM_TYPE_FLUORO:{
-                    pinMode(SAN_PIN, OUTPUT);
-                    digitalWrite(SAN_PIN, HIGH);
                     unsigned long timeOut = millis();
-                    while (debounceButton(XRAY_BUTTON_PIN) == false || millis() - timeOut >= BUTTON_TIMEOUT_MS){}
+                    while (debounceButton(XRAY_BUTTON_PIN) == false && millis() - timeOut <= BUTTON_TIMEOUT_MS){}
 
-                    while (digitalRead(XRAY_BUTTON_PIN) == LOW)
-                    {
+                    if (digitalRead(XRAY_BUTTON_PIN) == LOW) {
+                        pinMode(SAN_PIN, OUTPUT);
                         digitalWrite(SAN_PIN, LOW);
+                        while (digitalRead(XRAY_BUTTON_PIN) == LOW) { }
+                        pinMode(SAN_PIN, INPUT);
                     }
-                    digitalWrite(SAN_PIN, HIGH);
                 } break;
                 case EXAM_TYPE_SERIES_WITH_MOTION: {
-                    // Geometry drives SAN here — master must release.
-                    pinMode(SAN_PIN, INPUT);
+                    // Geometry drives SAN here — master stays released.
                 } break;
             }
-
-            // Release SAN so the XrayGenerator can drive it
-            pinMode(SAN_PIN, INPUT);
             
             lastPayload = 0x00;
             unsigned long doseStart = millis();
@@ -200,6 +224,8 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
             writeMsgToSerialPort(doseMsg);
             Serial.print("DOSE:"); Serial.println(lastPayload);
 
+            analogWrite(REDLED, 0);
+            analogWrite(GRNLED, 0);
             centralAcqState = STATE_CONNECTED;
             slaveOneReady = false;
             slaveTwoReady = false;
@@ -292,8 +318,9 @@ void setup() {
 
     pinMode(REDLED, OUTPUT);
     pinMode(GRNLED, OUTPUT);
-    pinMode(PREPARE_BUTTON_PIN, INPUT_PULLUP);
+    pinMode(PREPARE_BUTTON_PIN, INPUT);
     pinMode(XRAY_BUTTON_PIN, INPUT_PULLUP);
+    pinMode(SAN_PIN, INPUT);
 }
 
 void loop() {
@@ -310,15 +337,18 @@ void loop() {
     }*/
 }
 
+// debounceButton – per-pin debounce.
+// Each pin tracks its own last-press timestamp so PREPARE_BUTTON and
+// XRAY_BUTTON never interfere with each other.
 bool debounceButton(uint8_t pin) {
-    if (millis() - lastPress >= 20){
+    static unsigned long lastPressMap[20] = {0};   // one slot per Arduino pin
+    if (pin >= 20) return false;
+    if (millis() - lastPressMap[pin] >= 20) {
         if (digitalRead(pin) == LOW) {
-            delay(20);
-            lastPress = millis();
+            lastPressMap[pin] = millis();
             return true;
         }
     }
-
     return false;
 }
 

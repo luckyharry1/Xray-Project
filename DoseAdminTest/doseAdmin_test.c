@@ -24,6 +24,28 @@ void test_LeakTest(void)
 	*a = 666;
 }
 
+void readFromFile_WhenFileAvaliableWithData_ThenReadAndReturn0(void){
+    addPatient("test");
+    writeToFile("data.bin");
+    resetPatientDoseAdmin();
+    readFromFile("data.bin");
+    TEST_ASSERT_NOT_NULL(isPatientPresent("test"));
+
+}
+
+void readFromFile_WhenFileUnavaliable_ThenReturnMinus1(void){
+    TEST_ASSERT_EQUAL(-1, readFromFile("test.txt"));
+}
+
+
+void writeToFile_WhenFileUnavaliable_ThenReturnMinus1(void){
+    TEST_ASSERT_EQUAL(-1, writeToFile("test.txt"));
+}
+
+
+//-----------------------------------------
+
+
 void selectPatient_WhenUnavaliablePatientSelected_ThenReturn0(void)
 {
     TEST_ASSERT_EQUAL(-1, selectPatient("test1"));
@@ -165,6 +187,10 @@ int main()
     UnityBegin();
 
     MY_RUN_TEST(test_LeakTest);
+
+    //MY_RUN_TEST(readFromFile_WhenFileAvaliableWithData_ThenReadAndReturn0);
+    MY_RUN_TEST(readFromFile_WhenFileUnavaliable_ThenReturnMinus1);
+    MY_RUN_TEST(writeToFile_WhenFileUnavaliable_ThenReturnMinus1);
 
     MY_RUN_TEST(selectPatient_WhenUnavaliablePatientSelected_ThenReturn0);
 
