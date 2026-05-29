@@ -300,14 +300,14 @@ int8_t readFromFile(char * filePath){
     int patientCount = ftell(record) / sizeOfPatient;  //ftell finds amount of bytes since start
 
     fseek(record, 0, SEEK_SET);
-    Patient* pat = NULL;
+    Patient* pat = calloc(1, sizeof(Patient));
     Patient* new = NULL;
 
     for(int i = 0; i< patientCount; i++){
         fread(pat, sizeof(Patient), 1, record); //store entrie struct in pat
 
         if (addPatient(pat->name) != 0){ //add name, allocate memory, handle pointers
-            return -2; //ADDPATIENT ERROR
+            return -2 ; //ADDPATIENT ERROR
         }
         new = isPatientPresent(pat->name); //pointer now to variable new for adding data
 
@@ -318,5 +318,6 @@ int8_t readFromFile(char * filePath){
     }
 
     fclose(record);
+    free(pat);
     return 0;
 }

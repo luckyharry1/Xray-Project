@@ -26,20 +26,15 @@ void test_LeakTest(void)
 
 void readFromFile_WhenFileAvaliableWithData_ThenReadAndReturn0(void){
     addPatient("test");
-    writeToFile("data.bin");
+    writeToFile("test.bin");
     resetPatientDoseAdmin();
-    readFromFile("data.bin");
+    readFromFile("test.bin");
     TEST_ASSERT_NOT_NULL(isPatientPresent("test"));
 
 }
 
-void readFromFile_WhenFileUnavaliable_ThenReturnMinus1(void){
-    TEST_ASSERT_EQUAL(-1, readFromFile("test.txt"));
-}
-
-
-void writeToFile_WhenFileUnavaliable_ThenReturnMinus1(void){
-    TEST_ASSERT_EQUAL(-1, writeToFile("test.txt"));
+void readFromFile_WhenFileUnavaliable_ThenReturnMinus2(void){
+    TEST_ASSERT_EQUAL(-2, readFromFile("test.txt"));
 }
 
 
@@ -188,9 +183,8 @@ int main()
 
     MY_RUN_TEST(test_LeakTest);
 
-    //MY_RUN_TEST(readFromFile_WhenFileAvaliableWithData_ThenReadAndReturn0);
-    MY_RUN_TEST(readFromFile_WhenFileUnavaliable_ThenReturnMinus1);
-    MY_RUN_TEST(writeToFile_WhenFileUnavaliable_ThenReturnMinus1);
+    MY_RUN_TEST(readFromFile_WhenFileAvaliableWithData_ThenReadAndReturn0);
+    MY_RUN_TEST(readFromFile_WhenFileUnavaliable_ThenReturnMinus2);
 
     MY_RUN_TEST(selectPatient_WhenUnavaliablePatientSelected_ThenReturn0);
 
