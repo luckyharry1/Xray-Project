@@ -1,17 +1,16 @@
 @startuml CentralAcquisition_Sequence
-title Central Acquisition - Exam Sequence (e.g. SINGLE_SHOT)
+title Central Acquisition - Exam Sequence
 
 skinparam sequenceMessageAlign center
-autonumber
+
 
 actor       "Operator"                                 as OP
 participant "Patient Admin\n(PC / host)"               as PA
 participant "Central Acquisition\n(I2C master)"        as CA
 participant "X-ray Generator\n(I2C slave_1)"           as XG
-participant "Dose Admin\n(serial sink on PA)"          as DA
 
-== Link establishment ==
-OP -> PA : start session
+
+OP -> PA : Start session
 PA -> CA : $CONNECT#                  (Serial, framed)
 note right of CA
   getEvent() -> EV_CONNECT_MSG_RECEIVED
@@ -31,7 +30,7 @@ end note
 loop up to MAX_RETRIES (3), exits early on ACK
   CA -> XG : Wire.beginTransmission(SLAVE_1)\nwrite(MSG_START)\nwrite(EXAM_TYPE_SINGLE_SHOT)\nendTransmission()
   activate XG
-  XG -> XG : onReceive(): handleMessage(MSG_START)\nrun SAN-pin sampled exposure loop
+  XG -> XG : onReceive(): handleMessage(MSG_START)\nRun exam loop waiting on SAN input
   CA -> CA : delay(100 ms)
   CA -> XG : Wire.requestFrom(SLAVE_1, 2)
   alt slave ready
@@ -40,7 +39,7 @@ loop up to MAX_RETRIES (3), exits early on ACK
     note right of CA: sendMessage() returns true,\nloop exits
   else slave busy
     XG --> CA : NAK + 0x00
-    note right of CA: keep polling within this retry
+    note right of CA: transmission retry
   else no response
     XG --> CA : (timeout / 0 bytes)
     note right of CA: log "NO RESPONSE",\nfall through to next retry
@@ -48,15 +47,18 @@ loop up to MAX_RETRIES (3), exits early on ACK
 end
 
 == Dose telemetry (concurrent, every 5 s) ==
+XG -->> CA : SAN = LOW
+CA -> XG : MSG_TYPE_DOSE_DATA
+XG -->> CA : <n>
 CA -->> PA : $DOSE:<n>#
-PA -> DA   : update dose ledger
 
 == Exam end / shutdown ==
 PA -> CA : $EXAM:0#                   (return to idle)
-CA -> XG : MSG_START, EXAM_TYPE_NONE
+CA -> XG : MSG_END
 XG --> CA : ACK
 PA -> CA : $DISCONNECT#
 CA -> PA : $DISCONNECT#               (ack via echo)
 note over CA: state -> DISCONNECTED
+PA -> OP : Session end
 
 @enduml
