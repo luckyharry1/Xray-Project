@@ -15,10 +15,15 @@ title Geometry - State Machine (proposed)
 '       SAN line to fire the X-ray Generator at each sample point.
 '
 '   SAN contract (open-drain, pulled HIGH by default):
-'     - SAN floats HIGH while geometry is stationary or under operator
-'       control during Idle.
-'     - SAN is driven LOW by Geometry while it is moving during the
-'       SERIES_WITH_MOTION exam, which the XrayGenerator samples to fire.
+'     SAN is a shared bus. Geometry must NEVER drive it from any state
+'     other than SERIES_WITH_MOTION/Sweeping, otherwise it would
+'     interfere with the XrayGenerator's own SAN sampling and with the
+'     dose-ready signaling on the same line.
+'     - Default: SAN pin is INPUT (high-Z), let the bus float.
+'     - Only on entry to SeriesWithMotion does Geometry configure the
+'       pin as OUTPUT, and only the Sweeping sub-state actively pulls
+'       SAN LOW. BetweenSamples releases it (back to INPUT / high-Z).
+'     - On exit from SeriesWithMotion the pin returns to INPUT.
 '
 '   I2C event handling on the slave side is identical in shape to the
 '   XrayGenerator: onReceive() updates {lastResponse, lastPayloadOutgoing},
@@ -29,9 +34,9 @@ title Geometry - State Machine (proposed)
 state Idle {
   [*] --> Stationary
 
-  state Stationary       : motors off\nSAN = HIGH (released)
-  state JoystickMove     : speed = f(joystick deflection)\ndrive motors\nSAN = HIGH
-  state FixedSpeedMove   : speed = FIXED_SPEED\ndrive motors\nSAN = HIGH
+  state Stationary       : motors off
+  state JoystickMove     : speed = f(joystick deflection)\ndrive motors
+  state FixedSpeedMove   : speed = FIXED_SPEED\ndrive motors
 
   Stationary     --> JoystickMove   : |joystick| > deadzone
   JoystickMove   --> Stationary     : joystick centered
@@ -52,20 +57,22 @@ state "Exam\n(MSG_START)" as Exam {
 
   state ChoosePayload <<choice>>
 
-  state ExamNone        : stop motors\nSAN = HIGH
-  state ExamSingleShot  : hold position\nSAN = HIGH\n(no motion needed)
-  state ExamSeries      : hold position\nSAN = HIGH\n(no motion needed)
+  state ExamNone        : stop motors
+  state ExamSingleShot  : hold position\n(no motion, SAN untouched)
+  state ExamSeries      : hold position\n(no motion, SAN untouched)
 
   state SeriesWithMotion {
+    SeriesWithMotion : entry / pinMode(SAN, OUTPUT)
+    SeriesWithMotion : exit  / pinMode(SAN, INPUT)\n          (release the bus)
     [*] --> Sweeping
-    state Sweeping       : drive motors along\nprogrammed profile\nSAN = LOW (fires X-ray)
-    state BetweenSamples : motors paused briefly\nSAN = HIGH
+    state Sweeping       : drive motors along\nprogrammed profile\ndrive SAN LOW\n(fires X-ray Generator)
+    state BetweenSamples : motors paused briefly\nrelease SAN (high-Z)
     Sweeping       --> BetweenSamples : sample point reached
     BetweenSamples --> Sweeping       : next sample due\n[shotCount < N]
     BetweenSamples --> [*]            : shotCount == N\nor end of profile
   }
 
-  state ExamFluoro      : hold position\nSAN = HIGH\n(no motion needed)
+  state ExamFluoro      : hold position\n(no motion, SAN untouched)
 
   ChoosePayload --> ExamNone          : [EXAM_TYPE_NONE]
   ChoosePayload --> ExamSingleShot    : [EXAM_TYPE_SINGLE_SHOT]
@@ -79,8 +86,8 @@ state "Exam\n(MSG_START)" as Exam {
   ExamFluoro       --> [*] : MSG_STOP received\nor exam end
 }
 
-Idle --> Exam : MSG_START\n/ lastResponse = ACK,\n  branch on lastPayloadIncoming\n  freeze operator input
-Exam --> Idle : run-to-completion\n/ motors off, SAN = HIGH,\n  resume operator input
+Idle --> Exam : MSG_START\n/ lastResponse = ACK,\n  branch on lastPayloadIncoming,\n  freeze operator input
+Exam --> Idle : run-to-completion\n/ motors off, SAN pin = INPUT,\n  resume operator input
 
 ' ---- I2C response side (read path) ----
 state ResponseRead : onRequest() writes\n{lastResponse, lastPayloadOutgoing}\nthen lastResponse = NAK
@@ -90,12 +97,22 @@ Exam --> ResponseRead : onRequest()\n(busy during exam -> NAK)
 ResponseRead --> Idle : return
 
 note right of Exam
-  Only SERIES_WITH_MOTION actually moves
-  during the exam. It is the source of the
-  SAN LOW pulses that the XrayGenerator
-  samples (see XrayGenerator's
-  ExposeSeriesMotion state: "on SAN==LOW
-  toggle PORTB").
+  SAN is a SHARED bus. Geometry must
+  never drive it from any state other
+  than SERIES_WITH_MOTION/Sweeping --
+  doing so would clobber the
+  XrayGenerator's own SAN sampling and
+  the dose-ready signaling on the same
+  line.
+
+  In every state outside Sweeping the
+  SAN pin is INPUT (high-Z); only on
+  entering SeriesWithMotion does it
+  become OUTPUT, and only Sweeping
+  pulls it LOW. BetweenSamples returns
+  it to high-Z, and exiting the
+  SeriesWithMotion composite restores
+  pinMode(SAN, INPUT).
 
   The other exam types ack and hold
   position because the X-ray Generator
