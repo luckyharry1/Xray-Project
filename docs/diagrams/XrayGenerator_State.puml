@@ -1,0 +1,70 @@
+@startuml XrayGenerator_State
+title X-ray Generator - State Machine
+
+' Source of truth: XrayGenerator/src/main.cpp
+' Role: I2C slave at I2C_ADDR_SLAVE_1.
+'   onReceive(msgType, payload) updates lastResponse and dispatches via
+'   handleMessage(); onRequest() returns {lastResponse, lastPayloadOutgoing}
+'   then resets lastResponse to NAK.
+'   PORTB bit 0 = pin 8 = X-ray emit; SAN_PIN = pin 2 = shoot trigger input.
+
+[*] --> Idle
+
+state Idle : entry / lastResponse = NAK\nwaits for I2C events
+Idle : on MSG_HEARTBEAT  / lastPayloadOutgoing = 0x01, lastResponse = ACK
+Idle : on MSG_DATA_READY / lastPayloadOutgoing = 0x01, lastResponse = ACK
+Idle : on MSG_STOP       / lastPayloadOutgoing = 0x00, lastResponse = ACK
+Idle : on MSG_ERROR      / (no-op, future)
+Idle : on unknown msg    / lastResponse = NAK
+
+' ---- Dispatch on MSG_START -------------------------------------------------
+state "Exposing\n(MSG_START)" as Exposing {
+  [*] --> ChoosePayload
+
+  state ChoosePayload <<choice>>
+  state ExposeNone            : PORTB &= ~0x01\n(idle the emit pin)
+  state ExposeSingleShot      : SAN_PIN = INPUT\nuntil shotCount == 3:\n  on SAN==LOW: pulse PORTB 10 ms
+  state ExposeSeries          : SAN_PIN = INPUT\nwait SAN -> LOW\nwhile SAN==LOW: toggle PORTB,\ndelay 10/490 ms
+  state ExposeSeriesMotion    : SAN_PIN = INPUT\nuntil shotCount == 10:\n  on SAN==LOW: toggle PORTB,\n  delay 10/490 ms
+  state ExposeFluoro          : SAN_PIN = INPUT\nwait SAN -> LOW\nuntil shotCount == 4\n  OR SAN==LOW:\n  toggle PORTB, delay 10/240 ms
+
+  ChoosePayload --> ExposeNone         : [EXAM_TYPE_NONE]
+  ChoosePayload --> ExposeSingleShot   : [EXAM_TYPE_SINGLE_SHOT]
+  ChoosePayload --> ExposeSeries       : [EXAM_TYPE_SERIES]
+  ChoosePayload --> ExposeSeriesMotion : [EXAM_TYPE_SERIES_WITH_MOTION]
+  ChoosePayload --> ExposeFluoro       : [EXAM_TYPE_FLUORO]
+
+  ExposeNone         --> [*]
+  ExposeSingleShot   --> [*] : shotCount reached
+  ExposeSeries       --> [*] : SAN released (HIGH)
+  ExposeSeriesMotion --> [*] : shotCount reached
+  ExposeFluoro       --> [*] : shotCount reached\nAND SAN released
+}
+
+Idle     --> Exposing : MSG_START\n/ lastResponse = ACK,\n  branch on lastPayloadIncoming
+Exposing --> Idle     : run-to-completion\n/ SAN_PIN = OUTPUT
+
+' ---- I2C response side (read path) ----
+state ResponseRead : onRequest() writes\n{lastResponse, lastPayloadOutgoing}\nthen lastResponse = NAK
+
+Idle     --> ResponseRead : onRequest()
+Exposing --> ResponseRead : onRequest()\n(slave currently busy -> NAK)
+ResponseRead --> Idle     : return
+
+note right of Exposing
+  Each exposure routine is implemented
+  as a blocking loop inside
+  handleMessage(MSG_START). While
+  running, onRequest() returning NAK
+  is what drives the master's retry
+  loop in CentralAcquisition (see
+  sendMessage() / "NAK, slave not
+  ready yet").
+
+  TODOs already marked in code:
+  - timeouts on the SAN-wait loops
+  - real sensor data instead of the
+    hard-coded 0x01 outgoing payload
+end note
+
+@enduml
