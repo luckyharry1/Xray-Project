@@ -12,14 +12,19 @@ state STATE_DISCONNECTED {
 }
 
 state STATE_CONNECTED {
-  [*] --> EXAM_IDLE
+  STATE_CONNECTED --> EXAM_IDLE
 
-  state EXAM_IDLE              : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_NONE)
-  EXAM_IDLE                    : do / GRNLED=ON, REDLED=OFF
-  state EXAM_SINGLE_SHOT       : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SINGLE_SHOT)
-  state EXAM_SERIES            : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SERIES)
-  state EXAM_SERIES_WITH_MOTION : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SERIES_WITH_MOTION)
-  state EXAM_FLUORO            : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_FLUORO)
+  state EXAM_IDLE              : sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_NONE)
+  state EXAM_IDLE              : sendMessage(SLAVE_2, MSG_START, EXAM_TYPE_NONE)
+  EXAM_IDLE                    : GRNLED=OFF, REDLED=OFF
+  state EXAM_SINGLE_SHOT       : sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SINGLE_SHOT)
+  state EXAM_SINGLE_SHOT       : sendMessage(SLAVE_2, MSG_START, EXAM_TYPE_SINGLE_SHOT)
+  state EXAM_SERIES            : sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SERIES)
+  state EXAM_SERIES            : sendMessage(SLAVE_2, MSG_START, EXAM_TYPE_SERIES)
+  state EXAM_SERIES_WITH_MOTION : sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SERIES_WITH_MOTION)
+  state EXAM_SERIES_WITH_MOTION : sendMessage(SLAVE_2, MSG_START, EXAM_TYPE_SERIES_WITH_MOTION)
+  state EXAM_FLUORO            : sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_FLUORO)
+  state EXAM_FLUORO            : sendMessage(SLAVE_2, MSG_START, EXAM_TYPE_FLUORO)
 
   EXAM_IDLE               --> EXAM_SINGLE_SHOT        : EV_EXAM_SINGLE_SHOT\n(EXAM:1)
   EXAM_IDLE               --> EXAM_SERIES             : EV_EXAM_SERIES\n(EXAM:2)
@@ -32,14 +37,7 @@ state STATE_CONNECTED {
   EXAM_FLUORO             --> EXAM_IDLE : EV_IDLE (EXAM:0)
 }
 
-STATE_DISCONNECTED --> STATE_CONNECTED    : EV_CONNECT_MSG_RECEIVED\n/ echo CONNECT_MSG
-STATE_CONNECTED    --> STATE_DISCONNECTED : EV_DISCONNECT_MSG_RECEIVED\n/ echo DISCONNECT_MSG
-
-note right of STATE_DISCONNECTED
-  Concurrent activity in loop():
-  every 5000 ms a "$DOSE:<n>#"
-  frame is pushed on Serial to
-  the Patient Admin.
-end note
+STATE_DISCONNECTED --> STATE_CONNECTED    : EV_CONNECT_MSG_RECEIVED\nwrite CONNECT_MSG
+STATE_CONNECTED    --> STATE_DISCONNECTED : EV_DISCONNECT_MSG_RECEIVED\nwrite DISCONNECT_MSG
 
 @enduml
