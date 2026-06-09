@@ -1,0 +1,85 @@
+@startuml PatientAdmin_State
+title Patient Administration - State Machine
+
+' Source of truth:
+'   Product/main.c        - top-level loop, connection state, menu dispatch
+'   Product/menu.c        - displayMenu / getMenuChoice
+'   Product/CentralAcquisitionProxy.c - connect / disconnect / selectExaminationType
+'   Shared/doseAdmin.c    - patient hash table
+'
+' The Patient Admin host program has two independent state variables.
+' We render each as its own state machine to keep transition scopes clean:
+'   1. Menu / interaction loop (the main flow driven by getMenuChoice())
+'   2. Central-Acquisition connection state (toggled by connect/disconnect)
+
+' =============================================================
+' 1) MENU / INTERACTION LOOP
+' =============================================================
+
+[*] --> Startup
+Startup : entry / initHashTable()
+Startup : do    / connectWithCentralAcquisition()
+Startup --> MainMenu
+
+MainMenu : displayMenu()\ngetMenuChoice()
+
+state ViewTable      : printTable()
+state AddPatient     : scanf(name)\naddPatient()
+state SelectPatient  : scanf(name)\nselectPatient()\non success: managePatient()
+state DeletePatient  : scanf(name)\nremovePatient()
+state SelectExamType : guard: connectionState == CONNECTED\nscanf(0..4)\nselectExaminationType()\nwrites "$EXAM:n#" on Serial
+
+MainMenu --> ViewTable      : MO_VIEW_TABLE
+MainMenu --> AddPatient     : MO_ADD_PATIENT
+MainMenu --> SelectPatient  : MO_SELECT_PATIENT
+MainMenu --> DeletePatient  : MO_DELETE_PATIENT
+MainMenu --> SelectExamType : MO_SELECT_EXAMINATION_TYPE\n[guard: CONNECTED]
+MainMenu --> Shutdown       : MO_QUIT
+
+ViewTable      --> MainMenu : redisplay
+AddPatient     --> MainMenu : done / cancel (name == "0")
+SelectPatient  --> MainMenu : done / cancel / not found
+DeletePatient  --> MainMenu : done
+SelectExamType --> MainMenu : done / not connected
+
+Shutdown : entry / if CONNECTED:\n          disconnectFromCentralAcquisition()
+Shutdown : exit  / return 0
+Shutdown --> [*]
+
+note right of MainMenu
+  Dose telemetry ("$DOSE:<n>#") arrives
+  asynchronously from the Central Acq
+  and is consumed by
+  getDoseDataFromCentralAcquisition()
+  -> addPatientDose() (the read path in
+  main.c is currently commented out).
+end note
+
+' =============================================================
+' 2) CENTRAL ACQUISITION CONNECTION (independent variable)
+' =============================================================
+
+state "Central Acquisition Connection" as CONN {
+  [*] --> NotConnected
+  NotConnected : connectionState =\nNOT_CONNECTED_WITH_CENTRAL_ACQUISITION
+  Connected    : connectionState =\nCONNECTED_WITH_CENTRAL_ACQUISITION
+
+  NotConnected --> Connected    : connectWithCentralAcquisition() == true\n(send $CONNECT#, recv $CONNECT#)
+  Connected    --> NotConnected : disconnectFromCentralAcquisition()\n(send $DISCONNECT#, recv $DISCONNECT#)
+}
+
+note right of CONN
+  Both handshakes are blocking and
+  retry up to 10 times with sleep(1)
+  between attempts (see connect()
+  and disconnectFromCentralAcquisition()
+  in CentralAcquisitionProxy.c).
+
+  The Connection variable evolves
+  independently of the Menu state and
+  is queried as a guard for
+  MO_SELECT_EXAMINATION_TYPE and as a
+  pre-action for MO_QUIT.
+end note
+
+@enduml
