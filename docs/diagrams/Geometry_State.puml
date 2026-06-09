@@ -1,0 +1,114 @@
+@startuml Geometry_State
+title Geometry - State Machine (proposed)
+
+' Source of inspiration:
+'   XrayGenerator/src/main.cpp - the sister I2C-slave structure
+'   System requirements (operator joystick + button, SAN line on the bus)
+'   Geometry/src/main.cpp      - current skeleton (only stubs implemented)
+'
+' Role: I2C slave (intended I2C_ADDR_SLAVE_2; the skeleton currently uses
+'       SLAVE_1, which collides with XrayGenerator and needs fixing).
+'       The Geometry positions the C-arm / detector. While idle it is
+'       under operator control (joystick or fixed-speed button). During
+'       an exam it is mostly passive, EXCEPT for SERIES_WITH_MOTION,
+'       where it sweeps along a programmed motion profile and uses the
+'       SAN line to fire the X-ray Generator at each sample point.
+'
+'   SAN contract (open-drain, pulled HIGH by default):
+'     - SAN floats HIGH while geometry is stationary or under operator
+'       control during Idle.
+'     - SAN is driven LOW by Geometry while it is moving during the
+'       SERIES_WITH_MOTION exam, which the XrayGenerator samples to fire.
+'
+'   I2C event handling on the slave side is identical in shape to the
+'   XrayGenerator: onReceive() updates {lastResponse, lastPayloadOutgoing},
+'   onRequest() returns them and resets lastResponse to NAK.
+
+[*] --> Idle
+
+state Idle {
+  [*] --> Stationary
+
+  state Stationary       : motors off\nSAN = HIGH (released)
+  state JoystickMove     : speed = f(joystick deflection)\ndrive motors\nSAN = HIGH
+  state FixedSpeedMove   : speed = FIXED_SPEED\ndrive motors\nSAN = HIGH
+
+  Stationary     --> JoystickMove   : |joystick| > deadzone
+  JoystickMove   --> Stationary     : joystick centered
+  Stationary     --> FixedSpeedMove : button pressed
+  JoystickMove   --> FixedSpeedMove : button pressed\n(button overrides joystick)
+  FixedSpeedMove --> Stationary     : button released
+
+  Idle : on MSG_HEARTBEAT  / lastPayloadOutgoing = posStatus, lastResponse = ACK
+  Idle : on MSG_DATA_READY / lastPayloadOutgoing = posStatus, lastResponse = ACK
+  Idle : on MSG_STOP       / lastPayloadOutgoing = 0x00,      lastResponse = ACK
+  Idle : on MSG_ERROR      / (no-op, future)
+  Idle : on unknown msg    / lastResponse = NAK
+}
+
+' ---- Dispatch on MSG_START -------------------------------------------------
+state "Exam\n(MSG_START)" as Exam {
+  [*] --> ChoosePayload
+
+  state ChoosePayload <<choice>>
+
+  state ExamNone        : stop motors\nSAN = HIGH
+  state ExamSingleShot  : hold position\nSAN = HIGH\n(no motion needed)
+  state ExamSeries      : hold position\nSAN = HIGH\n(no motion needed)
+
+  state SeriesWithMotion {
+    [*] --> Sweeping
+    state Sweeping       : drive motors along\nprogrammed profile\nSAN = LOW (fires X-ray)
+    state BetweenSamples : motors paused briefly\nSAN = HIGH
+    Sweeping       --> BetweenSamples : sample point reached
+    BetweenSamples --> Sweeping       : next sample due\n[shotCount < N]
+    BetweenSamples --> [*]            : shotCount == N\nor end of profile
+  }
+
+  state ExamFluoro      : hold position\nSAN = HIGH\n(no motion needed)
+
+  ChoosePayload --> ExamNone          : [EXAM_TYPE_NONE]
+  ChoosePayload --> ExamSingleShot    : [EXAM_TYPE_SINGLE_SHOT]
+  ChoosePayload --> ExamSeries        : [EXAM_TYPE_SERIES]
+  ChoosePayload --> SeriesWithMotion  : [EXAM_TYPE_SERIES_WITH_MOTION]
+  ChoosePayload --> ExamFluoro        : [EXAM_TYPE_FLUORO]
+
+  ExamNone         --> [*]
+  ExamSingleShot   --> [*] : MSG_STOP received\nor exam end
+  ExamSeries       --> [*] : MSG_STOP received\nor exam end
+  ExamFluoro       --> [*] : MSG_STOP received\nor exam end
+}
+
+Idle --> Exam : MSG_START\n/ lastResponse = ACK,\n  branch on lastPayloadIncoming\n  freeze operator input
+Exam --> Idle : run-to-completion\n/ motors off, SAN = HIGH,\n  resume operator input
+
+' ---- I2C response side (read path) ----
+state ResponseRead : onRequest() writes\n{lastResponse, lastPayloadOutgoing}\nthen lastResponse = NAK
+
+Idle --> ResponseRead : onRequest()
+Exam --> ResponseRead : onRequest()\n(busy during exam -> NAK)
+ResponseRead --> Idle : return
+
+note right of Exam
+  Only SERIES_WITH_MOTION actually moves
+  during the exam. It is the source of the
+  SAN LOW pulses that the XrayGenerator
+  samples (see XrayGenerator's
+  ExposeSeriesMotion state: "on SAN==LOW
+  toggle PORTB").
+
+  The other exam types ack and hold
+  position because the X-ray Generator
+  drives its own SAN-pin loop directly
+  from the operator's Xray button.
+end note
+
+note left of Idle
+  Operator input is only honored while
+  Idle. Entering the Exam composite
+  freezes the joystick / button inputs
+  so a stray operator press cannot
+  perturb a programmed sweep.
+end note
+
+@enduml
