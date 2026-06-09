@@ -1,0 +1,45 @@
+@startuml CentralAcquisition_State
+title Central Acquisition - State Machine
+
+' Source of truth: CentralAcquisition/src/main.cpp
+' Driven by handleEvent(EVENTS) on top of the events returned by getEvent().
+
+[*] --> STATE_DISCONNECTED
+
+state STATE_DISCONNECTED {
+  STATE_DISCONNECTED : ignores EXAM events
+  STATE_DISCONNECTED : on EV_CONNECT_MSG_RECEIVED -> echo CONNECT_MSG
+}
+
+state STATE_CONNECTED {
+  [*] --> EXAM_IDLE
+
+  state EXAM_IDLE              : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_NONE)
+  EXAM_IDLE                    : do / GRNLED=ON, REDLED=OFF
+  state EXAM_SINGLE_SHOT       : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SINGLE_SHOT)
+  state EXAM_SERIES            : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SERIES)
+  state EXAM_SERIES_WITH_MOTION : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_SERIES_WITH_MOTION)
+  state EXAM_FLUORO            : do / sendMessage(SLAVE_1, MSG_START, EXAM_TYPE_FLUORO)
+
+  EXAM_IDLE               --> EXAM_SINGLE_SHOT        : EV_EXAM_SINGLE_SHOT\n(EXAM:1)
+  EXAM_IDLE               --> EXAM_SERIES             : EV_EXAM_SERIES\n(EXAM:2)
+  EXAM_IDLE               --> EXAM_SERIES_WITH_MOTION : EV_EXAM_SERIES_WITH_MOTION\n(EXAM:3)
+  EXAM_IDLE               --> EXAM_FLUORO             : EV_EXAM_FLUORO\n(EXAM:4)
+
+  EXAM_SINGLE_SHOT        --> EXAM_IDLE : EV_IDLE (EXAM:0)
+  EXAM_SERIES             --> EXAM_IDLE : EV_IDLE (EXAM:0)
+  EXAM_SERIES_WITH_MOTION --> EXAM_IDLE : EV_IDLE (EXAM:0)
+  EXAM_FLUORO             --> EXAM_IDLE : EV_IDLE (EXAM:0)
+}
+
+STATE_DISCONNECTED --> STATE_CONNECTED    : EV_CONNECT_MSG_RECEIVED\n/ echo CONNECT_MSG
+STATE_CONNECTED    --> STATE_DISCONNECTED : EV_DISCONNECT_MSG_RECEIVED\n/ echo DISCONNECT_MSG
+
+note right of STATE_DISCONNECTED
+  Concurrent activity in loop():
+  every 5000 ms a "$DOSE:<n>#"
+  frame is pushed on Serial to
+  the Patient Admin.
+end note
+
+@enduml
