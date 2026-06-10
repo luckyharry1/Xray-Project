@@ -14,6 +14,24 @@ participant "SAN bus\n(shared line)"         as SAN
 ' Byte counts on each arrow follow the layouts in
 ' Communication_Protocol_Frames.puml.
 
+== 0. Session start: Patient Admin <-> Central Acq connect handshake ==
+note over PA, CA
+  Driven by connectWithCentralAcquisition() in
+  Product/CentralAcquisitionProxy.c. Blocking
+  handshake, retry up to 10 times with sleep(1).
+  On the CA side this raises EV_CONNECT_MSG_RECEIVED
+  and moves the state from DISCONNECTED to CONNECTED.
+end note
+OP -> PA : start session
+loop until ACK or 10 retries
+  PA -> CA : $CONNECT#                                    \n[Serial,  9 B]
+  alt CA received "$CONNECT#"
+    CA -> PA : $CONNECT#                                  \n[Serial,  9 B] (echo = ACK)
+  else timeout / mismatch
+    note right of PA: sleep(1), tryCount++
+  end
+end
+
 == 1. Operator selects the exam ==
 OP -> PA : push "Series with Motion"
 PA -> CA : $EXAM:3#                                       \n[Serial,  8 B]
@@ -77,6 +95,7 @@ CA -> PA : $DISCONNECT#                                   \n[Serial, 12 B]
 == Total wire bytes for this exam (excluding SAN) ==
 note over PA, GE
   Serial (PA <-> CA):
+    2 x  CONNECT   handshake  =  9 B each =  18 B (more if retries)
     1 x  EXAM:3  start        =  8 B
     K x  DOSE:<n> telemetry   ~ 10 B each (K depends on exam duration)
     1 x  EXAM:0  cleanup      =  8 B
