@@ -1,0 +1,96 @@
+@startuml Communication_Protocol_Example
+title Communication Protocol - Example: SERIES_WITH_MOTION exam end-to-end
+
+skinparam sequenceMessageAlign center
+autonumber
+
+actor       "Operator"                       as OP
+participant "Patient Admin\n(PC host)"       as PA
+participant "Central Acq\n(I2C master)"      as CA
+participant "X-ray Generator\n(slave 0x02)"  as XG
+participant "Geometry\n(slave 0x03)"         as GE
+participant "SAN bus\n(shared line)"         as SAN
+
+' Byte counts on each arrow follow the layouts in
+' Communication_Protocol_Frames.puml.
+
+== 1. Operator selects the exam ==
+OP -> PA : push "Series with Motion"
+PA -> CA : $EXAM:3#                                       \n[Serial,  8 B]
+
+== 2. Central Acq fans out MSG_START to both slaves ==
+
+group I2C transaction with X-ray Generator
+  CA -> XG : write MsgType=MSG_START(0x1B), Payload=EXAM_TYPE_SERIES_WITH_MOTION(0x03)\n[I2C write, 2 data B + 1 addr B]
+  CA -> CA : delay(100 ms)
+  CA -> XG : requestFrom(0x02, 2)\n[I2C read req, 1 addr B]
+  XG --> CA : ACK(0x06), 0x00\n[I2C read, 2 data B]
+end
+
+group I2C transaction with Geometry
+  CA -> GE : write MsgType=MSG_START(0x1B), Payload=EXAM_TYPE_SERIES_WITH_MOTION(0x03)\n[I2C write, 2 data B + 1 addr B]
+  CA -> CA : delay(100 ms)
+  CA -> GE : requestFrom(0x03, 2)\n[I2C read req, 1 addr B]
+  GE --> CA : ACK(0x06), 0x00\n[I2C read, 2 data B]
+end
+
+== 3. Synchronized motion + exposure via SAN ==
+
+GE -> SAN : pinMode(SAN, OUTPUT)\n(entry to SeriesWithMotion)
+
+loop for each of the N sample points along the motion profile
+  GE -> SAN : drive LOW\n(Sweeping)
+  XG -> SAN : sample
+  SAN --> XG : LOW
+  XG -> XG : pulse PORTB (X-ray LED on 10 ms)\nshotCount++
+  GE -> SAN : release (high-Z)\n(BetweenSamples)
+  SAN --> XG : HIGH (no shot)
+end
+
+GE -> SAN : pinMode(SAN, INPUT)\n(exit, release bus)
+
+== 4. Dose telemetry, asynchronous (every 5 s) ==
+CA -->> PA : $DOSE:42#                                    \n[Serial, 10 B]
+note right of CA: $DOSE:n# is pushed periodically\nfrom CentralAcquisition::loop()
+
+== 5. Operator ends the exam ==
+OP -> PA : push "Idle"
+PA -> CA : $EXAM:0#                                       \n[Serial,  8 B]
+
+group cleanup to X-ray Generator
+  CA -> XG : write MSG_START(0x1B), EXAM_TYPE_NONE(0x00)\n[I2C, 2 data B]
+  CA -> XG : requestFrom(0x02, 2)
+  XG --> CA : ACK(0x06), 0x00\n[I2C, 2 data B]
+end
+
+group cleanup to Geometry
+  CA -> GE : write MSG_START(0x1B), EXAM_TYPE_NONE(0x00)\n[I2C, 2 data B]
+  CA -> GE : requestFrom(0x03, 2)
+  GE --> CA : ACK(0x06), 0x00\n[I2C, 2 data B]
+end
+
+== 6. Session teardown ==
+OP -> PA : quit
+PA -> CA : $DISCONNECT#                                   \n[Serial, 12 B]
+CA -> PA : $DISCONNECT#                                   \n[Serial, 12 B]
+
+== Total wire bytes for this exam (excluding SAN) ==
+note over PA, GE
+  Serial (PA <-> CA):
+    1 x  EXAM:3  start        =  8 B
+    K x  DOSE:<n> telemetry   ~ 10 B each (K depends on exam duration)
+    1 x  EXAM:0  cleanup      =  8 B
+    2 x  DISCONNECT           = 12 B each = 24 B
+
+  I2C (CA <-> XG and CA <-> GE), per slave per round trip:
+    write     = 1 addr + 2 data =  3 B
+    read req  = 1 addr           =  1 B
+    read data = 2 data           =  2 B
+    -> 6 B per round trip, 2 slaves x 2 rounds (start + cleanup)
+       = 24 B on the I2C bus for the control path,
+       plus the polling delays during EXAM_TYPE_SERIES_WITH_MOTION.
+
+  SAN: 0 bytes -- it is a single shared signal level.
+end note
+
+@enduml

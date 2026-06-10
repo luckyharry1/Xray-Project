@@ -1,0 +1,104 @@
+@startuml Communication_Protocol_Frames
+title Communication Protocol - Frame Layouts
+
+' Source of truth:
+'   Interface_PatAdmin_CentralAcq/Protocol_PatientAdmin_CentralAcq.h
+'   CentralAcquisition/include/COMM_PROTOCOL.h
+'   XrayGenerator/src/main.cpp  (onReceive / onRequest behavior)
+
+skinparam classAttributeIconSize 0
+
+' =============================================================
+' Serial framed-text protocol (Patient Admin <-> Central Acq)
+' =============================================================
+class "Serial frame\nPatient Admin <-> Central Acq" as Serial <<frame>> {
+  byte 0      : MSG_START_SYMBOL  '$'  (1 B)
+  byte 1..N   : ASCII payload    (N B, no NUL)
+  byte N+1    : MSG_END_SYMBOL    '#'  (1 B)
+  ..
+  total       : N + 2 bytes
+  MAX_MSG_SIZE: 100 bytes (incl. terminator)
+  baud        : 9600  8N1
+}
+
+note right of Serial
+  Payload alphabet (ASCII strings):
+    "CONNECT"        7 B  ->  $CONNECT#        9 B on the wire
+    "DISCONNECT"    10 B  ->  $DISCONNECT#    12 B
+    "EXAM:<n>"       6 B  ->  $EXAM:1#         8 B   (n = 0..4)
+    "DOSE:<n>"     6..N B ->  $DOSE:42#       10 B   (n = ASCII decimal)
+  Receiver state machine:
+    WAITING_FOR_MSG_START_SYMBOL -> WAITING_FOR_MSG_END_SYMBOL -> ...
+end note
+
+' =============================================================
+' I2C protocol (Central Acq master <-> Xray / Geometry slaves)
+' =============================================================
+class "I2C WRITE phase\nMaster -> Slave" as I2CW <<frame>> {
+  S         : start condition
+  addr<<1|0 : 7-bit slave addr + W bit  (1 B)
+  byte 0    : MsgType   (1 B)
+  byte 1    : Payload   (1 B)  (e.g. EXAM_TYPE_*)
+  P         : stop condition
+  ..
+  data total: 2 bytes
+  3 bytes on the wire incl. address
+  bus       : standard mode  100 kHz
+}
+
+class "I2C READ phase\nMaster <- Slave\n(requestFrom 2 B)" as I2CR <<frame>> {
+  S         : start condition (repeated)
+  addr<<1|1 : 7-bit slave addr + R bit  (1 B)
+  byte 0    : lastResponse  (1 B)  ACK=0x06 / NAK=0x07
+  byte 1    : lastPayloadOutgoing (1 B)
+  P         : stop condition
+  ..
+  data total: 2 bytes
+  3 bytes on the wire incl. address
+}
+
+note bottom of I2CW
+  MsgType (enum, 1 B):
+    MSG_HEARTBEAT   = 0x1A
+    MSG_START       = 0x1B
+    MSG_STOP        = 0x1C
+    MSG_ERROR       = 0x1D
+    MSG_ACK         = 0x1E
+    MSG_DATA_READY  = 0x1F
+    MSG_UNKNOWN     = 0xFF
+  Payload for MSG_START is EXAM_TYPE_*:
+    NONE 0x00  SINGLE_SHOT 0x01  SERIES 0x02
+    SERIES_WITH_MOTION 0x03  FLUORO 0x04
+  Addresses:
+    Master      0x01
+    Xray Gen    0x02  (SLAVE_1)
+    Geometry    0x03  (SLAVE_2  intended; skeleton uses SLAVE_1)
+end note
+
+note bottom of I2CR
+  Master always requests exactly 2 bytes.
+  After onRequest() the slave resets
+  lastResponse to NAK, so the next
+  request returns NAK unless onReceive()
+  has set ACK in the meantime --
+  this is what makes the master's
+  retry loop converge.
+end note
+
+' =============================================================
+' SAN bus (electrical, not byte-oriented)
+' =============================================================
+class "SAN bus\n(shared 1-wire signal)" as SAN <<line>> {
+  topology  : open-drain, pull-up to HIGH
+  HIGH      : bus idle / no event
+  LOW       : pulled by producer:
+              * XrayGenerator -> dose ready
+              * Geometry      -> sweeping (fires Xray)
+  width     : 0 bytes  (it is just a level)
+}
+
+Serial -[hidden]right- I2CW
+I2CW   -[hidden]right- I2CR
+I2CR   -[hidden]right- SAN
+
+@enduml
