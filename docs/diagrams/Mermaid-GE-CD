@@ -1,0 +1,18 @@
+flowchart LR
+    CA["CentralAcquisition System\n(Arduino)"]
+    IO["Physical I/O\n(Joystick & Servo Motor)"]
+    SAN["SAN line\n(Additional Wire for Arduino Communication)"]
+
+    subgraph GEO ["Geometry System (Arduino)"]
+        direction TB
+        COMM["CA Communication\n────────────\nCommand receipt\nStatus reporting"]
+        STATE["Motion State Machine\n──────────────\nACQUIRING state\nExam type check\n(SERIES_WITH_MOTION)"]
+        ACT["I/O Control\n───────────\nreadJoystick()\nmoveServo(speed)"]
+
+        COMM <-->|"Exam command"| STATE
+        STATE <-->|"Motion enable/Disable"| ACT
+    end
+
+    CA <-->|"Exam command, Exam type"| COMM
+    ACT <-->|"Servo drive indicator"| SAN
+    ACT <-->|"Joystick input\nServo drive signal"| IO
