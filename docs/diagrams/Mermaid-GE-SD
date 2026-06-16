@@ -1,0 +1,19 @@
+flowchart TD
+    MAIN["main.cpp\nState machine\nsetup() / loop()\nonReceive() / onRequest()"]
+
+    MOTION["Motion Control\nreadJoystick()\nmoveServo(speed)\nSAN bus drive (SeriesWithMotion)"]
+
+    COMM["COMM_PROTOCOL.h\nI2C addresses · MsgType enum\nACK / NAK constants"]
+    WIRE["Wire.h\nArduino I2C library"]
+    ARDH["Arduino.h\nArduino core"]
+
+    MAIN <--> MOTION
+    MAIN -. "#include" .-> COMM
+    MAIN -. "#include" .-> WIRE
+    MAIN -. "#include" .-> ARDH
+
+    style MAIN     fill:#FFE599,stroke:#B8860B,stroke-width:2px,color:#000
+    style MOTION   fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style COMM     fill:#90EE90,stroke:#228B22,color:#000
+    style WIRE     fill:#CFE2F3,stroke:#1155CC,color:#000
+    style ARDH     fill:#CFE2F3,stroke:#1155CC,color:#000
