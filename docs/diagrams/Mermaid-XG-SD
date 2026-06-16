@@ -1,0 +1,25 @@
+flowchart TD
+    MAIN["main.cpp\nsetup() / loop()"]
+
+    SEND["sendMessage()\nI2C master + retry logic"]
+    LED["LED Driver\nX-ray pulse activation (stub)"]
+    LDR["LDR Sampler\nDose measurement (stub)"]
+
+    COMM["COMM_PROTOCOL.h\nI2C addresses · MsgType enum\nACK / NAK constants"]
+    WIRE["Wire.h\nArduino I2C library"]
+    ARDH["Arduino.h\nArduino core"]
+
+    MAIN --> SEND
+    MAIN -.-> LED
+    MAIN -.-> LDR
+    SEND -. "#include" .-> COMM
+    SEND -. "#include" .-> WIRE
+    MAIN -. "#include" .-> ARDH
+
+    style MAIN fill:#FFE599,stroke:#B8860B,stroke-width:2px,color:#000
+    style SEND fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style LED  fill:#F5F5F5,stroke:#999999,color:#666
+    style LDR  fill:#F5F5F5,stroke:#999999,color:#666
+    style COMM fill:#90EE90,stroke:#228B22,color:#000
+    style WIRE fill:#CFE2F3,stroke:#1155CC,color:#000
+    style ARDH fill:#CFE2F3,stroke:#1155CC,color:#000
