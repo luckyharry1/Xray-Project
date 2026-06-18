@@ -17,7 +17,11 @@ int main(int argc, char* argv[])
 {
 	static CENTRAL_ACQUISITION_CONNECTION_STATE centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
 		
-	initHashTable();
+	initPatientDoseAdmin();
+
+	if(readFromFile("data.bin") != 0){
+		printf("Reading from file failed, continuing..\n");
+	}
 	
 	if (connectWithCentralAcquisition()) {	
 		centralAcqConnectionState = CONNECTED_WITH_CENTRAL_ACQUISITION;
@@ -63,7 +67,7 @@ int main(int argc, char* argv[])
 						break;
 					}
 					if (name[0] == 0){
-						break;
+						continue;
 					}
 
 					int strLen = sizeof(name);
@@ -134,7 +138,7 @@ int main(int argc, char* argv[])
 					printf("Enter the name of the patient you would like to remove:\n");
 
 					char name[MAX_NAME];
-					if (scanf("%s", &name) != 1){
+					if (scanf("%s", name) != 1){
 						printf("ERROR: Invalid Input.");
 					break;
 					}
@@ -151,7 +155,7 @@ int main(int argc, char* argv[])
 				case MO_SELECT_EXAMINATION_TYPE:{
 					system("clear");
 					if (centralAcqConnectionState == CONNECTED_WITH_CENTRAL_ACQUISITION) {
-						uint32_t doseData;
+						uint16_t doseData;
 						uint8_t examType;
 						
 						printf("Exam Type Menu\n[0]\tNO EXAM TYPE\n[1]\tSINGLE SHOT EXAM\n[2]\tSERIES EXAM\n[3]\tSERIES WITH MOTION\n[4]\tFLOURO EXAM\n");
@@ -178,7 +182,12 @@ int main(int argc, char* argv[])
 								selectExaminationType(EXAM_TYPE_FLUORO);
 								break;
 						}
-
+						if (examType != EXAM_TYPE_NONE){
+							if (getDoseDataFromCentralAcquisition(&doseData)) {
+								printf("Received dose: %u\n", doseData);
+								addPatientDose(doseData);
+							}
+						}
 						//if (getDoseDataFromCentralAcquisition(&doseData)) {
 						//	printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
 						//}
@@ -194,6 +203,7 @@ int main(int argc, char* argv[])
 						disconnectFromCentralAcquisition();
 					}
 					centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
+					writeToFile("data.bin");
 					return 0;
 				}
 				default:{

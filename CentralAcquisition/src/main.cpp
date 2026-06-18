@@ -4,12 +4,26 @@
 #include <string.h>
 #include <stdbool.h>
 #include "../../Interface_PatAdmin_CentralAcq/Protocol_PatientAdmin_CentralAcq.h"
-#include "COMM_PROTOCOL.h"
+#include "../../Interface_CentralAcq_Devices/COMM_PROTOCOL.h"
 
 #define MAX_RETRIES 3
 
 #define GRNLED 5
 #define REDLED 6
+#define SAN_PIN 2
+#define PREPARE_BUTTON_PIN 8
+#define XRAY_BUTTON_PIN 10
+
+#define I2C_RESPONSE_TIMEOUT_MS  200    // wait for slave to put bytes on the bus
+#define PREPARE_TIMEOUT_MS       5000   // give up STATE_PREPARING if no slave responds
+#define PREPARED_INTERVAL_MS     500    // ms between I2C broadcasts inside STATE_PREPARING
+#define DATA_READY_TIMEOUT_MS    2000   // give up polling MSG_DATA_READY
+#define BUTTON_TIMEOUT_MS        10000  // time to wait on button press
+
+static ExamType currentExamType = EXAM_TYPE_NONE;
+bool slaveOneReady = false;
+bool slaveTwoReady = false;
+uint16_t lastPayload = 0x00;
 
 typedef enum {
 	EV_CONNECT_MSG_RECEIVED, 
@@ -19,12 +33,15 @@ typedef enum {
     EV_EXAM_SERIES,
     EV_EXAM_SERIES_WITH_MOTION,
     EV_EXAM_FLUORO,
+    EV_PREPARE_BUTTON_PRESSED,
     EV_NO_EVENT,
 } EVENTS;
 
 typedef enum {
     STATE_DISCONNECTED,
     STATE_CONNECTED,
+    STATE_PREPARING,
+    STATE_ACQUIRING
 } CENTRAL_ACQ_STATES;
 
 typedef enum {
@@ -41,6 +58,7 @@ void EXAM_SERIES();
 void EXAM_SERIES_WITH_MOTION();
 void EXAM_FLOURO();
 bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg);
+bool debounceButton(uint8_t pin);
 
 void handleEvent(EVENTS event) //Check state and handle incoming events
 {
@@ -54,26 +72,149 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
             }
             break;
         case STATE_CONNECTED:
+            if (event == EV_CONNECT_MSG_RECEIVED) {
+                writeMsgToSerialPort(CONNECT_MSG);
+                break;
+            }
             if (event == EV_DISCONNECT_MSG_RECEIVED) {
                 centralAcqState = STATE_DISCONNECTED;
                 writeMsgToSerialPort(DISCONNECT_MSG);
             } else if (event == EV_IDLE){
-                EXAM_IDLE();
+                currentExamType = EXAM_TYPE_NONE;
             } 
             else if (event == EV_EXAM_SINGLE_SHOT) {
-                EXAM_SINGLE_SHOT();
+                currentExamType = EXAM_TYPE_SINGLE_SHOT;
             } 
             else if (event == EV_EXAM_SERIES) {
-                EXAM_SERIES();
+                currentExamType = EXAM_TYPE_SERIES;
             }
             else if (event == EV_EXAM_SERIES_WITH_MOTION) {
-                EXAM_SERIES_WITH_MOTION();
+                currentExamType = EXAM_TYPE_SERIES_WITH_MOTION;
+                
             }
             else if (event == EV_EXAM_FLUORO) {
-                EXAM_FLOURO();
+                currentExamType = EXAM_TYPE_FLUORO;
+            }
+            else if (event == EV_PREPARE_BUTTON_PRESSED && currentExamType != EXAM_TYPE_NONE){
+                centralAcqState = STATE_PREPARING;
             }
             break;
-    }
+            
+        case STATE_PREPARING: {
+            static unsigned long prepStart     = 0;
+            static unsigned long lastBroadcast = 0;
+
+            // Initialise timers on first entry to this state.
+            if (prepStart == 0) {
+                prepStart     = millis();
+                lastBroadcast = 0;   // force an immediate first broadcast
+            }
+
+            if (event == EV_IDLE) {
+                // PatientAdmin cancelled the exam while we were preparing
+                Serial.println("[PREPARING] Exam cancelled by PatientAdmin");
+                currentExamType = EXAM_TYPE_NONE;
+                slaveOneReady = slaveTwoReady = false;
+                prepStart = lastBroadcast = 0;
+                centralAcqState = STATE_CONNECTED;
+                break;
+            }
+
+
+            analogWrite(GRNLED, 100);
+            analogWrite(REDLED, 100);
+
+            if (millis() - lastBroadcast >= PREPARED_INTERVAL_MS) {
+                lastBroadcast = millis();
+
+                Serial.print("[PREPARING] Broadcasting exam 0x");
+                Serial.println((uint8_t)currentExamType, HEX);
+
+                if (!slaveOneReady) {
+                    slaveOneReady = sendMessage(I2C_ADDR_SLAVE_1, MSG_START, currentExamType);
+                }
+                // Uncomment when Geometry (SLAVE_2) is implemented:
+                // if (!slaveTwoReady) {
+                //     slaveTwoReady = sendMessage(I2C_ADDR_SLAVE_2, MSG_START, currentExamType);
+                // }
+            }
+
+            // ── Transition checks ─────────────────────────────────────────
+            if (slaveOneReady || slaveTwoReady) {
+                Serial.println("[PREPARING] Slave ready – moving to ACQUIRING");
+                analogWrite(GRNLED, 255);
+                analogWrite(REDLED, 0);
+                centralAcqState = STATE_ACQUIRING;
+                prepStart = lastBroadcast = 0;
+            } else if (millis() - prepStart >= PREPARE_TIMEOUT_MS) {
+                Serial.println("[PREPARING] TIMEOUT – no slave responded");
+                analogWrite(GRNLED, 0);
+                analogWrite(REDLED, 0);
+                currentExamType = EXAM_TYPE_NONE;
+                slaveOneReady = slaveTwoReady = false;
+                centralAcqState = STATE_CONNECTED;
+                prepStart = lastBroadcast = 0;
+            }
+        } break;
+
+        case STATE_ACQUIRING: {
+            analogWrite(REDLED, 255);
+            analogWrite(GRNLED, 0);
+
+            switch(currentExamType)
+            {
+                case EXAM_TYPE_NONE: { // MANAGE ERROR HANDLING TO THE REST
+                } break;
+                case EXAM_TYPE_SINGLE_SHOT: {
+                    unsigned long int timeOut = millis();
+                    while (debounceButton(XRAY_BUTTON_PIN) == false && millis() - timeOut <= BUTTON_TIMEOUT_MS){
+                    }
+                    if (digitalRead(XRAY_BUTTON_PIN) == LOW)
+                    {
+                        pinMode(SAN_PIN, OUTPUT);
+                        digitalWrite(SAN_PIN, LOW);
+                        delay(50);
+                        pinMode(SAN_PIN, INPUT);
+                    }
+                    sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
+                } break;
+                case EXAM_TYPE_SERIES: {
+                    unsigned long timeOut = millis();
+                    while (debounceButton(XRAY_BUTTON_PIN) == false && millis() - timeOut <= BUTTON_TIMEOUT_MS){}
+
+                    if (digitalRead(XRAY_BUTTON_PIN) == LOW) {
+                        pinMode(SAN_PIN, OUTPUT);
+                        digitalWrite(SAN_PIN, LOW);
+                        while (digitalRead(XRAY_BUTTON_PIN) == LOW) { }
+                        pinMode(SAN_PIN, INPUT);
+                    }
+                    sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
+                } break;
+                case EXAM_TYPE_FLUORO:{
+                    unsigned long timeOut = millis();
+                    while (debounceButton(XRAY_BUTTON_PIN) == false && millis() - timeOut <= BUTTON_TIMEOUT_MS){}
+
+                    if (digitalRead(XRAY_BUTTON_PIN) == LOW) {
+                        pinMode(SAN_PIN, OUTPUT);
+                        digitalWrite(SAN_PIN, LOW);
+                        while (digitalRead(XRAY_BUTTON_PIN) == LOW) { }
+                    }
+                    pinMode(SAN_PIN, INPUT);
+                    sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
+                } break;
+                case EXAM_TYPE_SERIES_WITH_MOTION: {
+                    // Geometry drives SAN here — master stays released.
+                } break;
+            }
+            
+            analogWrite(REDLED, 0);
+            analogWrite(GRNLED, 0);
+            centralAcqState = STATE_CONNECTED;
+            slaveOneReady = false;
+            slaveTwoReady = false;
+        } break;
+
+    }   
 }
 
 EVENTS getEvent() //Only checks whether a connect/disconnect message is recieved, and update state
@@ -102,7 +243,10 @@ EVENTS getEvent() //Only checks whether a connect/disconnect message is recieved
             }
         }
     }
-    return EV_IDLE;
+    if (debounceButton(PREPARE_BUTTON_PIN) == true){
+        return EV_PREPARE_BUTTON_PRESSED;
+    }
+    return EV_NO_EVENT;
 }
 
 static bool writeMsgToSerialPort(const char msg[MAX_MSG_SIZE]) //Write a string array to the serial port
@@ -158,84 +302,49 @@ void setup() {
 
     pinMode(REDLED, OUTPUT);
     pinMode(GRNLED, OUTPUT);
-
+    pinMode(PREPARE_BUTTON_PIN, INPUT);
+    pinMode(XRAY_BUTTON_PIN, INPUT_PULLUP);
+    pinMode(SAN_PIN, INPUT);
 }
 
 void loop() {
     handleEvent(getEvent());
 
 
-    // below some dummy code that sends dose data to the patient admin. Remove this dummy code asap.
-    static unsigned long timeOut = millis();
-    static int doseCnt = 0;
-    unsigned long curTime = millis();
-    if (curTime > timeOut) {
-        Serial.print("$DOSE:"); Serial.print(doseCnt); Serial.println("#");
-        timeOut = curTime + 5000;
-        doseCnt++;
+    // The XrayGenerator pulls SAN LOW to flag a dose is ready; request it once.
+    if (digitalRead(SAN_PIN) == LOW) {
+        sendMessage(I2C_ADDR_SLAVE_1, MSG_DATA_READY, 0x00);
+
+        if (lastPayload != 0x00){
+            char doseMsg[16];
+            snprintf(doseMsg, sizeof(doseMsg), "DOSE:%u", lastPayload);
+            writeMsgToSerialPort(doseMsg);
+            Serial.print("DOSE:"); Serial.println(lastPayload);
+            lastPayload = 0x00;
+        }
     }
 }
 
-void EXAM_IDLE(){
-    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_NONE) != true){
-        return;
+// debounceButton – per-pin debounce.
+// Each pin tracks its own last-press timestamp so PREPARE_BUTTON and
+// XRAY_BUTTON never interfere with each other.
+bool debounceButton(uint8_t pin) {
+    static unsigned long lastPressMap[20] = {0};   // one slot per Arduino pin
+    if (pin >= 20) return false;
+    if (millis() - lastPressMap[pin] >= 20) {
+        if (digitalRead(pin) == LOW) {
+            lastPressMap[pin] = millis();
+            return true;
+        }
     }
-    //sendMessage(I2C_ADDR_SLAVE_2, MSG_START, EXAM_TYPE_NONE);
-    analogWrite(GRNLED, 255);
-    analogWrite(REDLED, 0);
+    return false;
 }
 
-void EXAM_SINGLE_SHOT(){ // ADD XRAY BUTTON, WHEN PRESS DRIVE SAN LOW.
-    analogWrite(GRNLED, 0);
-    analogWrite(REDLED, 255);
-    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_SINGLE_SHOT) != true){
-        return;
-    }
-
-    analogWrite(GRNLED, 0);
-    analogWrite(REDLED, 255);
-    delay(5000);
-}
-
-void EXAM_SERIES(){
-    analogWrite(GRNLED, 0);
-    analogWrite(REDLED, 255);
-    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_SERIES) != true){
-        return;
-    }
-
-    analogWrite(GRNLED, 0);
-    analogWrite(REDLED, 255);
-}
-
-void EXAM_SERIES_WITH_MOTION(){
-    analogWrite(GRNLED, 0);
-    analogWrite(REDLED, 255);
-    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_SERIES_WITH_MOTION) != true){
-        return;
-    }
-
-    analogWrite(GRNLED, 0);
-    analogWrite(REDLED, 255);
-}
-
-void EXAM_FLOURO(){
-    analogWrite(GRNLED, 0);
-    analogWrite(REDLED, 255);
-    if (sendMessage(I2C_ADDR_SLAVE_1, MSG_START, EXAM_TYPE_FLUORO) != true){
-        return;
-    }
-
-    analogWrite(GRNLED, 0);
-    analogWrite(REDLED, 255);
-}
 
 bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg) {
-    for (uint8_t i = 0; i < MAX_RETRIES; i++){
-    //Serial.print("ATTEMPTING #"); Serial.println(i);
+    for (uint8_t i = 0; i < MAX_RETRIES; i++) {
         Serial.print("Type: "); Serial.print(msgType, HEX);
-        //Serial.print("Message: "); Serial.println(msg);
-        
+
         Wire.beginTransmission(slaveAddr);
         Wire.write((uint8_t)msgType);
         Wire.write(msg);
@@ -243,38 +352,37 @@ bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg) {
 
         delay(100);
 
-        bool recieveStatus = false;
-        while(recieveStatus == false){
+        Wire.requestFrom((uint8_t)slaveAddr, (uint8_t)3);
 
-            Wire.requestFrom((uint8_t)slaveAddr, (uint8_t)2);
-
-            if (Wire.available() >= 2) {
-                uint8_t response = Wire.read();
-                uint8_t payload  = Wire.read();
-                if (response == ACK){
-                    Serial.println("\tACK");
-                    recieveStatus = true;
-
-                    if (payload != 0x00){
-                        Serial.print("MESSAGE: 0x"); Serial.println(payload, HEX);
-                    }
-                    return true;
-                } else if (response == NAK){
-                    Serial.println("NAK, slave not ready yet");
-                    recieveStatus = false;
-                } else {
-                    Serial.println("UNKNOWN RESPONSE");
-                    recieveStatus = false;
-                }
-
-            Serial.println("ACK NOT RECIEVED");
-            
-            } else {
-                Serial.println("NO RESPONSE, DEVICE MAY BE UNAVALIABLE");
-            }
-
-            delay(100);
+        unsigned long waitStart = millis();
+        while (Wire.available() < 3 && millis() - waitStart < I2C_RESPONSE_TIMEOUT_MS) {
+            // wait shortly for the slave to send data
         }
+
+        if (Wire.available() == 3) {
+            uint8_t response  = Wire.read();   // byte 1: ACK / NAK
+            uint8_t payloadHi = Wire.read();   // byte 2: payload high
+            uint8_t payloadLo = Wire.read();   // byte 3: payload low
+
+            if (msgType == MSG_DATA_READY){
+                lastPayload = ((uint16_t)payloadHi << 8) | payloadLo;
+            }
+            if (response == ACK) {
+                Serial.println("\tACK");
+                if (lastPayload != 0x00) {
+                    Serial.print("MESSAGE: 0x"); Serial.println(lastPayload, HEX);
+                }
+                return true;
+            } else if (response == NAK) {
+                Serial.println("NAK, slave not ready yet");
+            } else {
+                Serial.println("UNKNOWN RESPONSE");
+            }
+        } else {
+            Serial.println("NO RESPONSE, DEVICE MAY BE UNAVAILABLE");
+        }
+
+        delay(100);
     }
 
     Serial.println("Failed after retries exceeded");

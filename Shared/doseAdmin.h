@@ -35,7 +35,7 @@ void printPatientData(char *name);
  *
  * It is a precondition that patientName is not NULL and is \0 terminated
  */
-Patient* isPatientPresent(char *name);
+//Patient* isPatientPresent(char *name);
 
 
 /***************************************************************************************
@@ -78,7 +78,7 @@ int8_t addPatientDose(uint16_t dosage);
  * Returns 0 on success
  * Returns -1 on failure
  */
-//int8_t writeToFile(char * filePath);
+int8_t writeToFile(char * filePath);
 
 
 /***************************************************************************************
@@ -87,6 +87,6 @@ int8_t addPatientDose(uint16_t dosage);
  * Returns 0 on success
  * Returns -1 on failure
  */
-//int8_t readFromFile(char * filePath);
+int8_t readFromFile(char * filePath);
 
 #endif
