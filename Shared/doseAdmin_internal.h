@@ -9,7 +9,7 @@ typedef struct{
 
 
 typedef struct patient {
-    char name[MAX_NAME];
+    char name[MAX_NAME + 1];
     doseData doseData[MAX_DOSE_MEASUREMENTS];    // dynamically allocated array of dose records
     int doseCount;
     struct patient* next;
@@ -19,6 +19,7 @@ typedef struct patient {
 
 void initPatientDoseAdmin();
 
+void resetPatientDoseAdmin();
 
 //adds a patient into the system
 //returns 0 if success, -1 if 

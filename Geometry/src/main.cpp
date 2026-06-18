@@ -1,7 +1,8 @@
-#include "../include/COMM_PROTOCOL.h"
+#include "../../Interface_CentralAcq_Devices/COMM_PROTOCOL.h"
+#include <Arduino.h>
 #include <Wire.h>
 
-static uint8_t lastResponse = NACK;
+static uint8_t lastResponse = NAK;
 static uint8_t lastPayload  = 0x00;
 
 //void onReceive(int numBytes);
@@ -44,7 +45,7 @@ void onReceive(int numBytes) {
       handleMessage(MSG_DATA_READY);
       break;
     default:
-      lastResponse = NACK;
+      lastResponse = NAK;
       break;
   }
 }

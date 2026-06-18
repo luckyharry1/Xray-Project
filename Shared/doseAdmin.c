@@ -17,8 +17,6 @@ Patient* hashTable[TABLE_SIZE]; // NULL = empty slot
 
 Patient* selectedPatient = NULL;
 
-static Patient* johnDoePtr = NULL;
-
 //int8_t patientDoseInPeriod(char * patientName,
 //                           date* startDate, date* endDate, uint32_t* totalDose){
 //	 return -1;
@@ -32,15 +30,6 @@ void getHashPerformance(size_t *totalNumberOfPatients, double *averageNumberOfPa
                         double *standardDeviation){
 	 return;
 }
-				
-int8_t writeToFile(char * filePath){
-	 return -1;
-}
-
-int8_t readFromFile(char * filePath){
-	 return -1;
-}
-
 
 unsigned int hash(char *name){ // unsigned means it can store only positive whole number, doubling the positive range
     int length = strlen(name); //count amount of char
@@ -63,8 +52,23 @@ void initPatientDoseAdmin(){
     }
 
     addPatient("JohnDoe");
-    johnDoePtr = isPatientPresent("JohnDoe");
     selectPatient("JohnDoe");
+}
+
+void resetPatientDoseAdmin(){
+    Patient* current = NULL;
+    Patient* next = NULL;
+    selectedPatient = NULL;
+
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        current = hashTable[i];
+        while(current != NULL){
+            next = current->next;
+            free(current);
+            current = next;
+        }
+        hashTable[i] = NULL;
+    }
 }
 
 
@@ -92,7 +96,7 @@ void printTable(){ //FOR DEBUGGING
 
 void toLowercase(char *nameLowercase, const char *name){
     size_t i;
-    for (i = 0; i < MAX_NAME - 1 && name[i] != '\0'; i++){
+    for (i = 0; i < MAX_NAME && name[i] != '\0'; i++){
         nameLowercase[i] = (char)tolower(name[i]);
     }
     nameLowercase[i] = '\0';
@@ -101,33 +105,35 @@ void toLowercase(char *nameLowercase, const char *name){
 
 // you need to read the header file (return values)
 int8_t addPatient(char *name){
+    if (strlen(name) > MAX_NAME){
+        return -1;
+    }
     char nameLowercase[MAX_NAME];
     toLowercase(nameLowercase, name);
 
     int index = hash(nameLowercase);
-    
-    Patient* tempPat = malloc(sizeof(Patient)); // free function for freeing memory, otherwise memory will stay allocated
+
+    if (isPatientPresent(name) != NULL){
+        return -1;
+    }
+
+    Patient* tempPat = calloc(1, sizeof(Patient)); // free function for freeing memory, otherwise memory will stay allocated
 
     if (tempPat == NULL){
         return -3; // HEAP FULL
     }
     
-    strncpy(tempPat->name, nameLowercase, MAX_NAME - 1);
-    tempPat->doseCount = 0;
+    strncpy(tempPat->name, nameLowercase, MAX_NAME);
 
     if (hashTable[index] == NULL) {
         hashTable[index] = tempPat;
-        hashTable[index]->next = NULL;
     } else {
+        hashTable[index]->prev = tempPat;
         tempPat->next = hashTable[index];
         hashTable[index] = tempPat;
     }
 
-    if (isPatientPresent(name) != NULL){
-        return 0;
-    }
-
-    return -1;
+    return 0;
 }
 
 
@@ -168,7 +174,7 @@ void managePatient(){
     char patientName[MAX_NAME];
     strncpy(patientName, selectedPatient->name, MAX_NAME);
 
-    handlePatientSelection(patientName);
+//    handlePatientSelection(patientName);
     return;
 }
 
@@ -188,18 +194,29 @@ int8_t removePatient(char *name){
     if (strncmp("johndoe", inputNameLowercase, MAX_NAME) == 0){
         return -1;
     }
+    if (strncmp(ptr->name, inputNameLowercase, MAX_NAME) != 0){
+        return -1;
+    }
+    
 
-    if (strncmp(ptr->name, inputNameLowercase, MAX_NAME) == 0){ // if patient is at the head of the chain
-        if (hashTable[index]->next != NULL){
-            hashTable[index] = hashTable[index]->next;
-        } else {
-            hashTable[index] = NULL;
-        }
+    if (ptr->prev == NULL){ //head of chain
+        hashTable[index] = ptr->next;
         free(ptr);
         return 0;
     }
 
-    Patient *current = hashTable[index]; // start at head 
+    if (ptr->next == NULL){ //Tail of chain
+        ptr->prev->next = NULL;
+        free(ptr);
+        return 0;
+    }
+        
+    ptr->next->prev = ptr->prev; //else middle of chain
+    ptr->prev->next = ptr->next;
+    free(ptr);
+    return 0;
+
+    /*Patient *current = hashTable[index]; // start at head 
     Patient* prev = NULL;
     while(current != NULL){
         if(strncmp(current->name, inputNameLowercase, MAX_NAME) == 0){
@@ -211,10 +228,7 @@ int8_t removePatient(char *name){
         }
         prev = current;
         current = current->next;
-        
-    }
-
-    return -1;
+    }*/
 }
 
 
@@ -236,4 +250,76 @@ int8_t addPatientDose(uint16_t dosage){
     selectedPatient->doseData[doseCnt].dosage     = dosage;
     selectedPatient->doseCount++;
 	return 0;
+}
+
+int8_t writeToFile(char * filePath){
+
+    FILE *record = fopen(filePath, "wb"); //write (binary mode)
+
+    if (record == NULL){
+        return -1; // memory FULL
+    }
+
+    Patient* current = NULL;  //RESETPATDOSEADMIN CODE STOLEN
+    Patient* next = NULL;
+    selectedPatient = NULL;
+
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        current = hashTable[i];
+        while(current != NULL){
+            next = current->next; //save next so we can move on at the end
+
+            current->prev = NULL;
+            current->next = NULL;
+
+            if (fwrite(current, sizeof(Patient), 1, record) != 1){  // write the entire patient structure data
+                fclose(record);
+                return -1; // memory FULL
+            }
+            free(current);
+            current = next; //move on, nothing left from previous current
+        }
+        hashTable[i] = NULL; //reset table
+    }
+
+    fclose(record);
+    return 0;
+}
+
+int8_t readFromFile(char * filePath){
+
+    FILE *record = fopen(filePath, "rb"); //read (binary mode)
+
+    if (record == NULL){
+        return -1; // NO FILE EXISTS
+    }
+
+    resetPatientDoseAdmin(); // clear file otherwise johndoe returns error
+
+    size_t sizeOfPatient = sizeof(Patient);
+
+    fseek(record, 0, SEEK_END); //set pos to end of file
+    int patientCount = ftell(record) / sizeOfPatient;  //ftell finds amount of bytes since start
+
+    fseek(record, 0, SEEK_SET);
+    Patient pat; 
+    Patient* new = NULL;
+
+    for(int i = 0; i< patientCount; i++){
+        fread(&pat, sizeof(Patient), 1, record); //store entrie struct in pat
+
+        if (addPatient(pat.name) != 0){ //add name, allocate memory, handle pointers
+            return -2 ; //ADDPATIENT ERROR
+        }
+        new = isPatientPresent(pat.name); //pointer now to variable new for adding data
+
+        new->doseCount = pat.doseCount;
+        for (int i = 0; i < pat.doseCount; i++){ //copy dosecount and dosedata depending on size
+            new->doseData[i] = pat.doseData[i];
+        }
+    }
+
+    fclose(record);
+   
+    return 0;
 }

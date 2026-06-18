@@ -1,20 +1,18 @@
 #ifndef PROTOCOL_PATIENTADMIN_CENTRALACQ_H
 #define PROTOCOL_PATIENTADMIN_CENTRALACQ_H
 
+// Exam-type constants live in the shared CentralAcq <-> devices header so
+// every Arduino and the Linux PatientAdmin code agree on the wire values.
+#include "../Interface_CentralAcq_Devices/COMM_PROTOCOL.h"
 
 typedef enum {
-	MSG_START_SYMBOL = '$', 
+	MSG_START_SYMBOL = '$',
 	MSG_END_SYMBOL = '#',
 	MSG_ARGUMENT_SEPARATOR = ':'
 } SYMBOLS;
 
-typedef enum {
-	EXAM_TYPE_NONE               = 0x00,
-	EXAM_TYPE_SINGLE_SHOT        = 0x01,
-	EXAM_TYPE_SERIES             = 0x02,
-	EXAM_TYPE_SERIES_WITH_MOTION = 0x03,
-	EXAM_TYPE_FLUORO             = 0x04,
-} EXAMINATION_TYPES;
+// Backward-compat alias so existing function signatures still compile.
+typedef ExamType EXAMINATION_TYPES;
 
 static const char CONNECT_MSG[] = "CONNECT";
 static const char DISCONNECT_MSG[] = "DISCONNECT";
