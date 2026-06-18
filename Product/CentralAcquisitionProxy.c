@@ -2,6 +2,7 @@
 #include "../Shared/doseAdmin.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h> // atoi
 #include <unistd.h> // sleep
 #include "serialPort.h"
 
@@ -64,18 +65,29 @@ void selectExaminationType(const EXAMINATION_TYPES examination)
 	}
 }
 
-bool getDoseDataFromCentralAcquisition(uint32_t * doseData){
+bool getDoseDataFromCentralAcquisition(uint16_t * doseData){
 	char msg[MAX_MSG_SIZE];
-	int dose;
 
-	if (getMsgFromCentralAcquisition(dose) != true) {
-		return false;
-	}
-	
 	if (doseData == NULL) {
 		return false;
 	}
-	return false;
+
+	if (getMsgFromCentralAcquisition(msg) != true) {
+		return false;
+	}
+
+	// The Arduino sends "DOSE:<value>"; convert the text after the ':' to an integer.
+	if (strncmp(msg, DOSE_MSG, strlen(DOSE_MSG)) != 0) {
+		return false;
+	}
+
+	char* separator = strchr(msg, MSG_ARGUMENT_SEPARATOR);
+	if (separator == NULL) {
+		return false;
+	}
+
+	*doseData = (uint16_t)atoi(separator + 1);
+	return true;
 }
 
 

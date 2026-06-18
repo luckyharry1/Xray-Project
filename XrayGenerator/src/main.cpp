@@ -3,21 +3,22 @@
 #include <Arduino.h>
 
 #define SAN_PIN 2
+#define LDR_PIN A0
 #define SINGLE_SHOT_COUNT 3
 #define SERIES_MOTION_SHOT_COUNT 10
 #define FLOURO_SHOT_COUNT 4
 #define EXAM_TIMEOUT_MS 10000
 
 static uint8_t lastResponse = NAK;
-static uint8_t lastPayloadOutgoing  = 0x00;
+static uint16_t lastPayloadOutgoing  = 0x00;
 static uint8_t lastPayloadIncoming = 0x00;
 static uint8_t currentExam = 0x00;
 static volatile bool startRequested = false;
+static volatile bool dataReadRequested = false;
 
 
 void onReceive(int numBytes);
 void onRequest();
-void handleMessage(MsgType type);
 
 void setup() {
   cli(); //disable all interrupts
@@ -35,34 +36,42 @@ void loop() {
  // ADD BOOL IF DATA READY SAN = LOW
   if (startRequested) {
     startRequested = false;
-    handleMessage(MSG_START);
   }
 
+  if (lastPayloadOutgoing > 0 && currentExam == EXAM_TYPE_NONE){
+    pinMode(SAN_PIN, OUTPUT);
+    digitalWrite(SAN_PIN, LOW);
+  } else {
+    pinMode(SAN_PIN, INPUT);
+  }
 
   switch (currentExam){
+
     case EXAM_TYPE_NONE:{
       PORTB = PORTB & ~0x01;
     break;
     }
     case EXAM_TYPE_SINGLE_SHOT: { //ADD TIMER FOR TIMEOUT
       pinMode(SAN_PIN, INPUT);
-        int shotCount = 0;
-        unsigned long waitTime = millis();
+      int shotCount = 0;
+      unsigned long waitTime = millis();
+      int baseline = analogRead(LDR_PIN);
 
-        while(shotCount < SINGLE_SHOT_COUNT && (millis() - waitTime) > EXAM_TIMEOUT_MS){
-          if (digitalRead(SAN_PIN)==LOW){
-            PORTB = PORTB | 0x01;
-            delay(10);
-            PORTB = PORTB & ~0x01;
-            shotCount++;
-          }
+      while(shotCount < SINGLE_SHOT_COUNT && (millis() - waitTime) < EXAM_TIMEOUT_MS){
+        if (digitalRead(SAN_PIN)==LOW){
+          PORTB = PORTB | 0x01;
+          delay(10);
+          PORTB = PORTB & ~0x01;
+          shotCount++;
         }
-      break;
+      }
+      lastPayloadOutgoing = analogRead(LDR_PIN) - baseline;
+    break;
     } 
 
     case EXAM_TYPE_SERIES: {
       pinMode(SAN_PIN, INPUT);
-
+      int baseline = analogRead(LDR_PIN);
       unsigned long waitTime = millis();
 
       while(digitalRead(SAN_PIN) == HIGH){
@@ -78,8 +87,10 @@ void loop() {
         delay(10);
         PORTB = PORTB ^ 0x01;
         delay(490);
+        if(lastPayloadOutgoing < analogRead(LDR_PIN)){ //find maximum value
+          lastPayloadOutgoing = analogRead(LDR_PIN) - baseline;
+        }
       }
-      pinMode(SAN_PIN,INPUT);
       break;
     }
 
@@ -87,6 +98,7 @@ void loop() {
     case EXAM_TYPE_SERIES_WITH_MOTION: {
       pinMode(SAN_PIN, INPUT);
       int shotCount = 0;
+      int baseline = analogRead(LDR_PIN);
 
       while(shotCount < SERIES_MOTION_SHOT_COUNT || lastResponse == NAK){ // ADD TIMER FOR TIMEOUT
         if (digitalRead(SAN_PIN) == LOW){
@@ -96,14 +108,17 @@ void loop() {
           delay(490);
           shotCount++;
         }
+        if(lastPayloadOutgoing < analogRead(LDR_PIN)){ //find maximum value
+            lastPayloadOutgoing = analogRead(LDR_PIN) - baseline;
+        }
       }
-      pinMode(SAN_PIN,INPUT);
       break;
     }
 
 
     case EXAM_TYPE_FLUORO: {
       int shotCount = 0;
+      int baseline = analogRead(LDR_PIN);
       pinMode(SAN_PIN, INPUT);
 
       unsigned long waitTime = millis();
@@ -121,17 +136,21 @@ void loop() {
         PORTB = PORTB ^ 0x01;
         delay(240);
         shotCount++;
+        if(lastPayloadOutgoing < analogRead(LDR_PIN)){ //find maximum value
+          lastPayloadOutgoing = analogRead(LDR_PIN) - baseline;
+        }
       }
-      pinMode(SAN_PIN,INPUT);
       break;
-    } 
+    }
+    currentExam = EXAM_TYPE_NONE; 
   }
 }
 
 
 void onReceive(int numBytes) {
   uint8_t msgType = Wire.read();
-  uint8_t msg = Wire.read();
+  uint8_t msg     = Wire.read();
+
   lastPayloadIncoming = msg;
 
   Serial.print("type=0x"); Serial.println(msgType, HEX);
@@ -142,22 +161,22 @@ void onReceive(int numBytes) {
 
   switch ((MsgType) msgType) {
     case MSG_HEARTBEAT:
-      handleMessage(MSG_HEARTBEAT);
       lastResponse = ACK;
       break;
     case MSG_START:
-      startRequested = true;   // defer blocking dispatch to loop()
+      startRequested = true;
+      currentExam = lastPayloadIncoming;
       lastResponse = ACK;
       break;
     case MSG_STOP:
-      handleMessage(MSG_STOP);
+      currentExam = EXAM_TYPE_NONE;
       lastResponse = ACK;
       break;
     case MSG_ERROR:
     //FUTURE PROOFING
       break;
     case MSG_DATA_READY:
-      handleMessage(MSG_DATA_READY);
+      dataReadRequested = true;
       lastResponse = ACK;
       break;
     default:
@@ -168,29 +187,13 @@ void onReceive(int numBytes) {
 
 void onRequest() {
   Wire.write(lastResponse);
-  Wire.write(lastPayloadOutgoing);
+  Wire.write((uint8_t)(lastPayloadOutgoing >> 8)); // high byte
+  Wire.write((uint8_t)(lastPayloadOutgoing & 0xFF)); //low byte
   Serial.print("Response=0x"); Serial.print(lastResponse, HEX);
   Serial.print(" Payload=0x"); Serial.println(lastPayloadOutgoing, HEX);
   lastResponse = NAK;
-  
-}
-
-void handleMessage(MsgType type){
-  switch (type) {
-    case MSG_START:
-    //SWITCH CASE SELECING EXAM FOR IN LOOP()
-      break;
-    case MSG_STOP:
-      lastPayloadOutgoing = 0x00; //RESETS THE RESPONSE, DATA CAN BE READ ONLY ONCE UNTIL RE-REQUEST
-
-      break;
-    case MSG_HEARTBEAT:
-      break;
-    case MSG_DATA_READY:
-      lastPayloadOutgoing = 0x01; //HARDCODED FOR NOW, THIS WOULD BE SENSOR DATA
-      break;
-    case MSG_ERROR:
-    default:
-      break;
+  if (dataReadRequested){
+    lastPayloadOutgoing = 0;
+    dataReadRequested = false;
   }
 }

@@ -18,6 +18,10 @@ int main(int argc, char* argv[])
 	static CENTRAL_ACQUISITION_CONNECTION_STATE centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
 		
 	initPatientDoseAdmin();
+
+	if(readFromFile("data.bin") != 0){
+		printf("Reading from file failed, continuing..\n");
+	}
 	
 	if (connectWithCentralAcquisition()) {	
 		centralAcqConnectionState = CONNECTED_WITH_CENTRAL_ACQUISITION;
@@ -63,7 +67,7 @@ int main(int argc, char* argv[])
 						break;
 					}
 					if (name[0] == 0){
-						break;
+						continue;
 					}
 
 					int strLen = sizeof(name);
@@ -179,8 +183,10 @@ int main(int argc, char* argv[])
 								break;
 						}
 						if (examType != EXAM_TYPE_NONE){
-							getDoseDataFromCentralAcquisition(&doseData);
-
+							if (getDoseDataFromCentralAcquisition(&doseData)) {
+								printf("Received dose: %u\n", doseData);
+								addPatientDose(doseData);
+							}
 						}
 						//if (getDoseDataFromCentralAcquisition(&doseData)) {
 						//	printf("Received dose: %d\n", doseData); // TODO: call the function that handles the received dose data
@@ -197,6 +203,7 @@ int main(int argc, char* argv[])
 						disconnectFromCentralAcquisition();
 					}
 					centralAcqConnectionState = NOT_CONNECTED_WITH_CENTRAL_ACQUISITION;
+					writeToFile("data.bin");
 					return 0;
 				}
 				default:{

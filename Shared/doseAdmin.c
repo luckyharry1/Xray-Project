@@ -105,7 +105,7 @@ void toLowercase(char *nameLowercase, const char *name){
 
 // you need to read the header file (return values)
 int8_t addPatient(char *name){
-    if (sizeof(name[80]) > sizeof(char)){
+    if (strlen(name) > MAX_NAME){
         return -1;
     }
     char nameLowercase[MAX_NAME];
@@ -211,7 +211,7 @@ int8_t removePatient(char *name){
         return 0;
     }
         
-    ptr->next->prev = ptr->prev;
+    ptr->next->prev = ptr->prev; //else middle of chain
     ptr->prev->next = ptr->next;
     free(ptr);
     return 0;
@@ -290,9 +290,11 @@ int8_t readFromFile(char * filePath){
 
     FILE *record = fopen(filePath, "rb"); //read (binary mode)
 
-    if(record == NULL){
+    if (record == NULL){
         return -1; // NO FILE EXISTS
     }
+
+    resetPatientDoseAdmin(); // clear file otherwise johndoe returns error
 
     size_t sizeOfPatient = sizeof(Patient);
 
@@ -300,24 +302,24 @@ int8_t readFromFile(char * filePath){
     int patientCount = ftell(record) / sizeOfPatient;  //ftell finds amount of bytes since start
 
     fseek(record, 0, SEEK_SET);
-    Patient* pat = calloc(1, sizeof(Patient));
+    Patient pat; 
     Patient* new = NULL;
 
     for(int i = 0; i< patientCount; i++){
-        fread(pat, sizeof(Patient), 1, record); //store entrie struct in pat
+        fread(&pat, sizeof(Patient), 1, record); //store entrie struct in pat
 
-        if (addPatient(pat->name) != 0){ //add name, allocate memory, handle pointers
+        if (addPatient(pat.name) != 0){ //add name, allocate memory, handle pointers
             return -2 ; //ADDPATIENT ERROR
         }
-        new = isPatientPresent(pat->name); //pointer now to variable new for adding data
+        new = isPatientPresent(pat.name); //pointer now to variable new for adding data
 
-        new->doseCount = pat->doseCount;
-        for (int i = 0; i < pat->doseCount; i++){ //copy dosecount and dosedata depending on size
-            new->doseData[i] = pat->doseData[i];
+        new->doseCount = pat.doseCount;
+        for (int i = 0; i < pat.doseCount; i++){ //copy dosecount and dosedata depending on size
+            new->doseData[i] = pat.doseData[i];
         }
     }
 
     fclose(record);
-    free(pat);
+   
     return 0;
 }

@@ -23,7 +23,7 @@
 static ExamType currentExamType = EXAM_TYPE_NONE;
 bool slaveOneReady = false;
 bool slaveTwoReady = false;
-uint8_t lastPayload = 0x00;
+uint16_t lastPayload = 0x00;
 
 typedef enum {
 	EV_CONNECT_MSG_RECEIVED, 
@@ -176,6 +176,7 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
                         delay(50);
                         pinMode(SAN_PIN, INPUT);
                     }
+                    sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
                 } break;
                 case EXAM_TYPE_SERIES: {
                     unsigned long timeOut = millis();
@@ -187,6 +188,7 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
                         while (digitalRead(XRAY_BUTTON_PIN) == LOW) { }
                         pinMode(SAN_PIN, INPUT);
                     }
+                    sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
                 } break;
                 case EXAM_TYPE_FLUORO:{
                     unsigned long timeOut = millis();
@@ -196,40 +198,22 @@ void handleEvent(EVENTS event) //Check state and handle incoming events
                         pinMode(SAN_PIN, OUTPUT);
                         digitalWrite(SAN_PIN, LOW);
                         while (digitalRead(XRAY_BUTTON_PIN) == LOW) { }
-                        pinMode(SAN_PIN, INPUT);
                     }
+                    pinMode(SAN_PIN, INPUT);
+                    sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
                 } break;
                 case EXAM_TYPE_SERIES_WITH_MOTION: {
                     // Geometry drives SAN here — master stays released.
                 } break;
             }
             
-            lastPayload = 0x00;
-            unsigned long doseStart = millis();
-            unsigned long tempTime = 0;
-            while (lastPayload == 0x00 && millis() - doseStart < DATA_READY_TIMEOUT_MS) { //EDIT TO USE SAN BUS
-                if (tempTime == 0){
-                    tempTime = millis();
-                }
-                if (millis() - tempTime >= 1000){
-                    sendMessage(I2C_ADDR_SLAVE_1, MSG_DATA_READY, 0x00);
-                    tempTime = 0;
-                }
-
-            }
-            sendMessage(I2C_ADDR_SLAVE_1, MSG_STOP, 0x00);
-
-            char doseMsg[16];
-            snprintf(doseMsg, sizeof(doseMsg), "DOSE:%u", lastPayload);
-            writeMsgToSerialPort(doseMsg);
-            Serial.print("DOSE:"); Serial.println(lastPayload);
-
             analogWrite(REDLED, 0);
             analogWrite(GRNLED, 0);
             centralAcqState = STATE_CONNECTED;
             slaveOneReady = false;
             slaveTwoReady = false;
         } break;
+
     }   
 }
 
@@ -326,15 +310,19 @@ void setup() {
 void loop() {
     handleEvent(getEvent());
 
-    /*// below some dummy code that sends dose data to the patient admin. Remove this dummy code asap.
-    static unsigned long timeOut = millis();
-    static int doseCnt = 0;
-    unsigned long curTime = millis();
-    if (curTime > timeOut) {
-        Serial.print("$DOSE:"); Serial.print(doseCnt); Serial.println("#");
-        timeOut = curTime + 5000;
-        doseCnt++;
-    }*/
+
+    // The XrayGenerator pulls SAN LOW to flag a dose is ready; request it once.
+    if (digitalRead(SAN_PIN) == LOW) {
+        sendMessage(I2C_ADDR_SLAVE_1, MSG_DATA_READY, 0x00);
+
+        if (lastPayload != 0x00){
+            char doseMsg[16];
+            snprintf(doseMsg, sizeof(doseMsg), "DOSE:%u", lastPayload);
+            writeMsgToSerialPort(doseMsg);
+            Serial.print("DOSE:"); Serial.println(lastPayload);
+            lastPayload = 0x00;
+        }
+    }
 }
 
 // debounceButton – per-pin debounce.
@@ -364,16 +352,21 @@ bool sendMessage(uint8_t slaveAddr, MsgType msgType, uint8_t msg) {
 
         delay(100);
 
-        Wire.requestFrom((uint8_t)slaveAddr, (uint8_t)2);
+        Wire.requestFrom((uint8_t)slaveAddr, (uint8_t)3);
 
         unsigned long waitStart = millis();
-        while (Wire.available() < 2 && millis() - waitStart < I2C_RESPONSE_TIMEOUT_MS) {
+        while (Wire.available() < 3 && millis() - waitStart < I2C_RESPONSE_TIMEOUT_MS) {
             // wait shortly for the slave to send data
         }
 
-        if (Wire.available() >= 2) {
-            uint8_t response = Wire.read();
-            lastPayload = Wire.read();
+        if (Wire.available() == 3) {
+            uint8_t response  = Wire.read();   // byte 1: ACK / NAK
+            uint8_t payloadHi = Wire.read();   // byte 2: payload high
+            uint8_t payloadLo = Wire.read();   // byte 3: payload low
+
+            if (msgType == MSG_DATA_READY){
+                lastPayload = ((uint16_t)payloadHi << 8) | payloadLo;
+            }
             if (response == ACK) {
                 Serial.println("\tACK");
                 if (lastPayload != 0x00) {
