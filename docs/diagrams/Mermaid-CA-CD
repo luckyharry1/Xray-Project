@@ -1,0 +1,32 @@
+flowchart LR
+    PA["PatientAdministration\n(PC)"]
+    DOC["Doctor / Clinician"]
+    IO["Physical I/O"]
+    XG["XrayGenerator\n(Arduino)"]
+    GEO["Geometry\n(Arduino)"]
+
+    subgraph CA ["CentralAcquisition System (Arduino)"]
+        direction TB
+        PACOMM["PC Communication\n─────────────────\nSerial protocol\nConnection logic"]
+        ESM["Exam State Machine\n─────────────────\nDisconnect handling\nExam type dispatcher"]
+        DEVCOMM["Device Communication\n─────────────────\n Device management\nExam command dispatch"]
+
+        PACOMM <-->|"Exam data \nDose report"| ESM
+        ESM <-->|"Exam command\nDose information"| DEVCOMM
+    end
+
+    PA <-->|"Exam type\nDose report"| PACOMM
+    DOC <--> IO
+    IO <-->|"Button signals\nStatus reports"| ESM
+    DEVCOMM <-->|"Exam information\nStatus\n Dose Information"| XG
+    DEVCOMM <-->|"Exam command \nResponse\nPosition information"| GEO
+
+    style CA      fill:#FFFACD,stroke:#B8860B,stroke-width:2px,color:#000
+    style PACOMM  fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style ESM     fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style DEVCOMM fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style PA  fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style DOC fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style IO  fill:#90EE90,stroke:#228B22,color:#000
+    style XG  fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style GEO fill:#D8D8F0,stroke:#7B68EE,color:#000

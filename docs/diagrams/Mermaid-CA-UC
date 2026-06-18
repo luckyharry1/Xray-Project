@@ -1,0 +1,44 @@
+flowchart LR
+    DOC["Doctor / Clinician"]
+    PA["PatientAdministration\n(PC)"]
+    XRAY["Xray Generator (Arduino)"]
+    GEO["Geometry (Arduino)"]
+
+    subgraph CA["CentralAcquisition System (Arduino)"]
+        UC1(["Connect/Disconnect"])
+        UC2(["Select Examination Type"])
+        UC3(["Prepare Examination"])
+        UC4(["Trigger Acquisition"])
+        UC5(["Receive Dose Report"])
+        UC6(["Command Xray Generator"])
+        UC7(["Communicate Dose Data"])
+        UC8(["Command Geometry System"])
+    end
+
+    DOC <--> PA
+    DOC --> UC3
+    DOC --> UC4
+    PA <--> UC1
+    PA --> UC2
+    PA --- UC5
+
+    
+    UC6 <--> XRAY
+    UC7 <--> XRAY
+    GEO --> XRAY
+    UC8 <--> GEO
+    
+
+    style CA  fill:#FFFACD,stroke:#B8860B,stroke-width:2px,color:#000
+    style DOC fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style PA  fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style GEO fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style XRAY fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style UC1 fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style UC2 fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style UC3 fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style UC4 fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style UC5 fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style UC6 fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style UC7 fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style UC8 fill:#D8D8F0,stroke:#7B68EE,color:#000

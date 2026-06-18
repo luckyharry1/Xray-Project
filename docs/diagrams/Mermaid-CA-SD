@@ -1,0 +1,38 @@
+flowchart TD
+    MAIN["main.cpp\nsetup() / loop()"]
+
+    GETEV["getEvent()\nSerial → EVENTS enum"]
+    HANDL["handleEvent()\nState Machine\nDISCONNECTED / CONNECTED"]
+    CHKSER["checkForMsgOnSerialPort()\nFramed message parser"]
+    WRTSER["writeMsgToSerialPort()\nFramed message writer"]
+    EXAMS["Exam Controllers\nEXAM_IDLE · SINGLE_SHOT\nSERIES · MOTION · FLUORO"]
+    SEND["sendMessage()\nI2C master + retry logic"]
+
+    COMM["COMM_PROTOCOL.h\nI2C addresses · MsgType enum\nACK / NAK constants"]
+    PROTO["Protocol_PatientAdmin_CentralAcq.h\nCONNECT / DISCONNECT\nEXAM / DOSE message strings"]
+    WIRE["Wire.h\nArduino I2C library"]
+    ARDH["Arduino.h\nArduino core"]
+
+    MAIN --> GETEV
+    MAIN --> HANDL
+    GETEV --> CHKSER
+    HANDL --> WRTSER
+    HANDL --> EXAMS
+    EXAMS --> SEND
+    CHKSER -. "#include" .-> PROTO
+    WRTSER -. "#include" .-> PROTO
+    SEND -. "#include" .-> COMM
+    SEND -. "#include" .-> WIRE
+    MAIN -. "#include" .-> ARDH
+
+    style MAIN   fill:#FFE599,stroke:#B8860B,stroke-width:2px,color:#000
+    style GETEV  fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style HANDL  fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style CHKSER fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style WRTSER fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style EXAMS  fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style SEND   fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style COMM   fill:#90EE90,stroke:#228B22,color:#000
+    style PROTO  fill:#90EE90,stroke:#228B22,color:#000
+    style WIRE   fill:#CFE2F3,stroke:#1155CC,color:#000
+    style ARDH   fill:#CFE2F3,stroke:#1155CC,color:#000

@@ -1,0 +1,26 @@
+flowchart TD
+    MAIN["main.c\nmain() · init · menu dispatch loop"]
+
+    MENU["menu.c / menu.h\ndisplayMenu() · getMenuChoice()\nhandlePatientSelection() · getInt()"]
+
+    PROXY["CentralAcquisitionProxy.c / .h\nconnectWithCentralAcquisition()\ndisconnectFromCentralAcquisition()\nselectExaminationType()\ngetDoseDataFromCentralAcquisition()"]
+
+    SERIAL["serialPort.c / .h\nsetupSerialPort() · closeSerialPort()\nreadSerialPort() · writeSerialPort()"]
+
+    DOSE["Shared/doseAdmin.c / doseAdmin.h\ninitPatientDoseAdmin() · addPatient()\nselectPatient() · removePatient()\naddPatientDose() · printTable()"]
+
+    PROTO["Interface_PatAdmin_CentralAcq/\nProtocol_PatientAdmin_CentralAcq.h\nCONNECT / DISCONNECT\nEXAM / DOSE message strings"]
+
+    MAIN --> MENU
+    MAIN --> PROXY
+    MAIN --> DOSE
+    MENU --> DOSE
+    PROXY --> SERIAL
+    PROXY -. "#include" .-> PROTO
+
+    style MAIN   fill:#FFE599,stroke:#B8860B,stroke-width:2px,color:#000
+    style MENU   fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style PROXY  fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style SERIAL fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style DOSE   fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style PROTO  fill:#90EE90,stroke:#228B22,color:#000

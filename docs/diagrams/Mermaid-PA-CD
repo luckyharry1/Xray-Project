@@ -1,0 +1,30 @@
+flowchart LR
+    User["Clinician / User"]
+    CentralAcq["CentralAcquisition System\n(X-ray Device)"]
+
+    subgraph PatAdmin ["Patient Administration System (PatAdmin)"]
+    
+        direction TD
+
+        UI["Terminal UI\n─────────────────\nMenu display & navigation\nUser input\nPatient selection"]
+
+        STORAGE["Patient Record Storage\n─────────────────\nPatient database\nDose record"]
+
+        COMM["Communication Interface\n─────────────────\nExam type communication\nDose data"]
+
+        UI <-->|"Patient information\nDose record"| STORAGE
+        UI -->|"Exam type selection"| COMM
+        COMM -->|"Received dose data"| STORAGE
+    end
+
+    User -->|"User Menu Application"| UI
+    UI -->|"Patient Administration Information"| User
+
+    COMM <--> CentralAcq
+
+    style PatAdmin fill:#FFFACD,stroke:#B8860B,stroke-width:2px,color:#000
+    style UI      fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style STORAGE fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style COMM    fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style User       fill:#D8D8F0,stroke:#7B68EE,color:#000
+    style CentralAcq fill:#D8D8F0,stroke:#7B68EE,color:#000
