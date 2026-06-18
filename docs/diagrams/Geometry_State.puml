@@ -1,0 +1,76 @@
+@startuml Geometry_State
+title Geometry - State Machine
+
+[*] --> Idle
+
+state Idle {
+  [*] --> Stationary
+
+  state Stationary       : motors off
+  state JoystickMove     : speed = f(joystick deflection)\ndrive motors
+  state FixedSpeedMove   : speed = FIXED_SPEED\ndrive motors
+
+  Stationary     --> JoystickMove   : joystick > deadzone
+  JoystickMove   --> Stationary     : joystick centered
+  Stationary     --> FixedSpeedMove : button pressed
+  JoystickMove   --> FixedSpeedMove : button pressed\n(button overrides joystick)
+  FixedSpeedMove --> Stationary     : button released
+
+  Idle : on MSG_HEARTBEAT   lastResponse = ACK
+  Idle : on MSG_DATA_READY  lastResponse = ACK
+  Idle : on MSG_STOP        lastResponse = ACK
+  Idle : on MSG_ERROR       future
+  Idle : on unknown msg     lastResponse = NAK
+}
+
+' ---- Dispatch on MSG_START -------------------------------------------------
+state "Exam\n(MSG_START)" as Exam {
+  [*] --> ChoosePayload
+
+  state ChoosePayload <<choice>>
+
+  state ExamNone        : stop motors
+  state ExamSingleShot  : move on joystick move\n(SAN untouched)
+  state ExamSeries      : move on joystick move\n(SAN untouched)
+
+  state SeriesWithMotion {
+    [*] --> Sweeping
+    state Sweeping       : drive motors when\njoystick is used\ndecide speed from\njoystick position OR if button\nis pressed, set speed\ndrive SAN LOW\n(fires X-ray Generator)
+    Sweeping --> [*]     : if joystick released for > 5s\nor timeout
+  }
+
+  state ExamFluoro      : move on joystick move\n(SAN untouched)
+
+  ChoosePayload --> ExamNone          : [EXAM_TYPE_NONE]
+  ChoosePayload --> ExamSingleShot    : [EXAM_TYPE_SINGLE_SHOT]
+  ChoosePayload --> ExamSeries        : [EXAM_TYPE_SERIES]
+  ChoosePayload --> SeriesWithMotion  : [EXAM_TYPE_SERIES_WITH_MOTION]
+  ChoosePayload --> ExamFluoro        : [EXAM_TYPE_FLUORO]
+
+  ExamNone         --> [*]
+  ExamSingleShot   --> [*] : MSG_STOP received\nor exam end
+  ExamSeries       --> [*] : MSG_STOP received\nor exam end
+  ExamFluoro       --> [*] : MSG_STOP received\nor exam end
+}
+
+Idle --> Exam : MSG_START
+Exam --> Idle : SAN pin = INPUT
+
+' ---- I2C response side (read path) ----
+state ResponseRead : onRequest() writes\nlastResponse, lastPayloadOutgoing\nthen lastResponse = NAK
+
+Idle --> ResponseRead : onRequest()
+Exam --> ResponseRead : onRequest()\n(busy -> NAK)
+ResponseRead --> Idle
+
+note right of Exam
+  SAN is a SHARED bus. Geometry must
+  never drive it from any state other
+  than SERIES_WITH_MOTION.
+  Doing so would mess with the
+  XrayGenerator's own SAN sampling and
+  the dose-ready signaling on the same
+  line.
+end note
+
+@enduml

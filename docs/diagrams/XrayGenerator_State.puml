@@ -1,0 +1,68 @@
+@startuml XrayGenerator_State
+title X-ray Generator - State Machine
+
+' Source of truth: XrayGenerator/src/main.cpp
+' Role: I2C slave at I2C_ADDR_SLAVE_1.
+'   onReceive(msgType, payload) updates lastResponse and dispatches via
+'   handleMessage(); onRequest() returns {lastResponse, lastPayloadOutgoing}
+'   then resets lastResponse to NAK.
+'   PORTB bit 0 = pin 8 = X-ray emit; SAN_PIN = pin 2 = shoot trigger input.
+
+[*] --> Idle
+
+state Idle : lastResponse = NAK\nwaits for I2C events
+Idle : on MSG_HEARTBEAT:   lastResponse = ACK
+Idle : on MSG_DATA_READY: lastResponse = ACK, lastPayloadOutgoing
+Idle : on MSG_STOP               lastPayloadOutgoing = 0x00, lastResponse = ACK
+Idle : on MSG_ERROR       
+Idle : on unknown msg     lastResponse = NAK
+
+' ---- Dispatch on MSG_START -------------------------------------------------
+state "Acquiring\n(MSG_START)" as Acquiring {
+  [*] --> ChoosePayload
+
+  state ChoosePayload <<choice>>
+  state ExamNone            : PORTB &= ~0x01\n(make sure xray == OFF)
+  state ExamSingleShot      : SAN_PIN = INPUT\nuntil shotCount == 3:\non SAN==LOW: pulse PORTB 10 ms\nCalculate doseage -> lastPayloadOutgoing
+  state ExamSeries          : SAN_PIN = INPUT\nwait SAN == LOW\nwhile SAN==LOW: pulse PORTB\ndelay 490 ms\nCalculate doseage -> lastPayloadOutgoing
+  state ExamSeriesMotion    : SAN_PIN = INPUT\nif SAN == LOW\nuntil shotCount == 10:\npulse PORTB\ndelay 490 ms\nCalculate doseage -> lastPayloadOutgoing
+  state ExamFluoro          : SAN_PIN = INPUT\nwait SAN == LOW\nuntil shotCount == 4\npulse PORTB, delay 240 ms\nCalculate doseage -> lastPayloadOutgoing
+
+  ChoosePayload --> ExamNone         : [EXAM_TYPE_NONE]
+  ChoosePayload --> ExamSingleShot   : [EXAM_TYPE_SINGLE_SHOT]
+  ChoosePayload --> ExamSeries       : [EXAM_TYPE_SERIES]
+  ChoosePayload --> ExamSeriesMotion : [EXAM_TYPE_SERIES_WITH_MOTION]
+  ChoosePayload --> ExamFluoro       : [EXAM_TYPE_FLUORO]
+
+  ExamNone         --> [*]
+  ExamSingleShot   --> [*] : shotCount reached\ntimeout
+  ExamSeries       --> [*] : shotCount reached\ntimeout\nSAN released
+  ExamSeriesMotion --> [*] : shotCount reached\ntimeout\nSAN released
+  ExamFluoro       --> [*] : shotCount reached\nSAN released
+}
+
+Idle     --> Acquiring : MSG_START\nlastPayloadIncoming
+Acquiring --> Idle
+
+' ---- I2C response side (read path) ----
+state ResponseRead : onRequest() writes\nlastResponse\nthen lastResponse = NAK
+
+Idle     --> ResponseRead : onRequest()
+ResponseRead --> Idle
+
+note left of Acquiring
+  Each exposure routine
+  is implemented
+  as a loop inside
+  handleMessage(MSG_START).
+  While running, 
+  onRequest() returns NAK
+end note
+
+note left of ResponseRead
+  After exam exposure is 
+  calculated and strored
+  in LastResponse
+  (slave is busy == NAK)
+end note
+@enduml

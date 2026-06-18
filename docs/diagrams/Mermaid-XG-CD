@@ -1,0 +1,28 @@
+flowchart TD
+    CA["CentralAcquisition System\n(X-ray Device)"]
+    PA["PatientAdministration\n(PC)"]
+
+    subgraph XG["XrayGenerator (Arduino)"]
+        MAIN["main.cpp\nOrchestrator & Main Loop"]
+        COMM["COMM_PROTOCOL.h\nI2C Message Definitions"]
+        LED["LED Driver\nX-ray Pulse Simulation"]
+        LDR["LDR Sampler\nDose Measurement"]
+
+        MAIN -- "message types &\naddress constants" --> COMM
+        MAIN -- "digital activation\npulse" --> LED
+        LDR -- "analogue light\nintensity reading" --> MAIN
+    end
+
+    CA -- "I2C: MSG_START\nexam type / MSG_STOP" --> MAIN
+    MAIN -- "I2C: ACK / NAK\nMSG_DATA_READY + dose" --> CA
+
+    MAIN -- "SAN: pull LOW\n(dose data ready)" --> PA
+    PA -- "SAN: floats HIGH\n(bus idle)" --> MAIN
+
+    style XG fill:#FFFACD,stroke:#B8860B,stroke-width:2px,color:#000
+    style MAIN fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style COMM fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style LED fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style LDR fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style CA fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style PA fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000

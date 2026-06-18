@@ -1,0 +1,21 @@
+flowchart LR
+    CA["CentralAcquisition\nSystem (X-ray Device)"]
+    G["Geometry System\n(Motor Controlling Device)"]
+
+    subgraph XG["XrayGenerator System (Arduino)"]
+        direction TB
+        UC1(["Exam\nInformation"])
+        UC5(["Report Dose\nData"])
+        UC7(["Communicate Motor Data"])
+    end
+
+    CA --> UC1
+    CA <--> UC5
+    G <--> UC7
+
+    style XG fill:#FFFACD,stroke:#B8860B,stroke-width:2px,color:#000
+    style CA fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style G fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style UC1 fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style UC5 fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
+    style UC7 fill:#D8D8F0,stroke:#7B68EE,stroke-width:1px,color:#000
